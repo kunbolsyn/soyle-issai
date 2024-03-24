@@ -11,9 +11,9 @@ React Native binding of [whisper.cpp](https://github.com/ggerganov/whisper.cpp).
 ## Screenshots
 
 | <img src="https://github.com/mybigday/whisper.rn/assets/3001525/2fea7b2d-c911-44fb-9afc-8efc7b594446" width="300" /> | <img src="https://github.com/mybigday/whisper.rn/assets/3001525/a5005a6c-44f7-4db9-95e8-0fd951a2e147" width="300" /> |
-| :------------------------------------------: | :------------------------------------------: |
-| iOS: Tested on iPhone 13 Pro Max | Android: Tested on Pixel 6 |
-| (tiny.en, Core ML enabled, release mode + archive) | (tiny.en, armv8.2-a+fp16, release mode) |
+| :------------------------------------------------------------------------------------------------------------------: | :------------------------------------------------------------------------------------------------------------------: |
+|                                           iOS: Tested on iPhone 13 Pro Max                                           |                                              Android: Tested on Pixel 6                                              |
+|                                  (tiny.en, Core ML enabled, release mode + archive)                                  |                                       (tiny.en, armv8.2-a+fp16, release mode)                                        |
 
 ## Installation
 
@@ -47,7 +47,9 @@ You will need to prebuild the project before using it. See [Expo guide](https://
 If you want to use realtime transcribe, you need to add the microphone permission to your app.
 
 ### iOS
-Add these lines to ```ios/[YOU_APP_NAME]/info.plist```
+
+Add these lines to `ios/[YOU_APP_NAME]/info.plist`
+
 ```xml
 <key>NSMicrophoneUsageDescription</key>
 <string>This app requires microphone access in order to transcribe speech</string>
@@ -56,10 +58,13 @@ Add these lines to ```ios/[YOU_APP_NAME]/info.plist```
 For tvOS, please note that the microphone is not supported.
 
 ### Android
-Add the following line to ```android/app/src/main/AndroidManifest.xml```
+
+Add the following line to `android/app/src/main/AndroidManifest.xml`
+
 ```xml
 <uses-permission android:name="android.permission.RECORD_AUDIO" />
 ```
+
 ## Tips & Tricks
 
 The [Tips & Tricks](docs/TIPS.md) document is a collection of tips and tricks for using `whisper.rn`.
@@ -86,7 +91,7 @@ Use realtime transcribe:
 ```js
 const { stop, subscribe } = await whisperContext.transcribeRealtime(options)
 
-subscribe(evt => {
+subscribe((evt) => {
   const { isCapturing, data, processTime, recordingTime } = evt
   console.log(
     `Realtime transcribing: ${isCapturing ? 'ON' : 'OFF'}\n` +
@@ -102,6 +107,7 @@ subscribe(evt => {
 In iOS, You may need to change the Audio Session so that it can be used with other audio playback, or to optimize the quality of the recording. So we have provided AudioSession utilities for you:
 
 Option 1 - Use options in transcribeRealtime:
+
 ```js
 import { AudioSessionIos } from 'whisper.rn'
 
@@ -116,12 +122,13 @@ const { stop, subscribe } = await whisperContext.transcribeRealtime({
 ```
 
 Option 2 - Manage the Audio Session in anywhere:
+
 ```js
 import { AudioSessionIos } from 'whisper.rn'
 
-await AudioSessionIos.setCategory(
-  AudioSessionIos.Category.PlayAndRecord, [AudioSessionIos.CategoryOption.MixWithOthers],
-)
+await AudioSessionIos.setCategory(AudioSessionIos.Category.PlayAndRecord, [
+  AudioSessionIos.CategoryOption.MixWithOthers,
+])
 await AudioSessionIos.setMode(AudioSessionIos.Mode.Default)
 await AudioSessionIos.setActive(true)
 // Then you can start do recording
@@ -142,8 +149,10 @@ const whisperContext = await initWhisper({
   filePath: require('../assets/ggml-tiny.en.bin'),
 })
 
-const { stop, promise } =
-  whisperContext.transcribe(require('../assets/sample.wav'), options)
+const { stop, promise } = whisperContext.transcribe(
+  require('../assets/sample.wav'),
+  options,
+)
 
 // ...
 ```
@@ -162,18 +171,19 @@ module.exports = {
       ...defaultAssetExts,
       'bin', // whisper.rn: ggml model binary
       'mil', // whisper.rn: CoreML model asset
-    ]
+    ],
   },
 }
 ```
 
 Please note that:
+
 - It will significantly increase the size of the app in release mode.
 - The RN packager is not allowed file size larger than 2GB, so it not able to use original f16 `large` model (2.9GB), you can use quantized models instead.
 
 ## Core ML support
 
-__*Platform: iOS 15.0+, tvOS 15.0+*__
+**_Platform: iOS 15.0+, tvOS 15.0+_**
 
 To use Core ML on iOS, you will need to have the Core ML model files.
 
