@@ -15,6 +15,7 @@ import Sound from 'react-native-sound'
 import { initWhisper, libVersion, AudioSessionIos } from '../../src' // whisper.rn
 import type { WhisperContext } from '../../src'
 import contextOpts from './context-opts'
+import VoiceRecorder from './VoiceRecorder'
 
 const sampleFile = require('../assets/jfk.wav')
 
@@ -102,6 +103,7 @@ export default function App() {
   const [stopTranscribe, setStopTranscribe] = useState<{
     stop: () => void
   } | null>(null)
+  const [recordedFilePath, setRecordedFilePath] = useState<string | null>(null)
 
   const log = useCallback((...messages: any[]) => {
     setLogs((prev) => [...prev, messages.join(' ')])
@@ -128,6 +130,9 @@ export default function App() {
     >
       <SafeAreaView style={styles.container}>
         <View style={styles.buttons}>
+          <VoiceRecorder onRecorded={setRecordedFilePath} />
+        </View>
+        <View style={styles.buttons}>
           <TouchableOpacity
             style={styles.button}
             onPress={async () => {
@@ -140,7 +145,7 @@ export default function App() {
               log('Initialize context...')
               const startTime = Date.now()
               const ctx = await initWhisper({
-                filePath: require('../assets/ggml-base.bin'),
+                filePath: require('../assets/ggml-tiny.en.bin'),
                 ...contextOpts,
               })
               const endTime = Date.now()
@@ -258,6 +263,53 @@ export default function App() {
             }}
           >
             <Text style={styles.buttonText}>Transcribe File</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.button}
+            disabled={!!stopTranscribe?.stop || !recordedFilePath}
+            onPress={async () => {
+              if (!whisperContext || !recordedFilePath)
+                return log('No context or no recorded file')
+
+              log('Start transcribing...')
+              const startTime = Date.now()
+              const { stop, promise } = whisperContext.transcribe(
+                recordedFilePath,
+                {
+                  maxLen: 1,
+                  tokenTimestamps: true,
+                  onProgress: (cur) => {
+                    log(`Transcribing progress: ${cur}%`)
+                  },
+                  language: 'en',
+                  // prompt: 'HELLO WORLD',
+                  // onNewSegments: (segments) => {
+                  //   console.log('New segments:', segments)
+                  // },
+                },
+              )
+              setStopTranscribe({ stop })
+              const { result, segments } = await promise
+              const endTime = Date.now()
+              setStopTranscribe(null)
+              setTranscibeResult(
+                `Transcribed result: ${result}\n` +
+                  `Transcribed in ${endTime - startTime}ms in ${mode} mode` +
+                  `\n` +
+                  `Segments:` +
+                  `\n${segments
+                    .map(
+                      (segment) =>
+                        `[${toTimestamp(segment.t0)} --> ${toTimestamp(
+                          segment.t1,
+                        )}]  ${segment.text}`,
+                    )
+                    .join('\n')}`,
+              )
+              log('Finished transcribing')
+            }}
+          >
+            <Text style={styles.buttonText}>Transcribe Recorded File</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[
