@@ -17,12 +17,14 @@
     "react-native-audio-recorder-player": "^3.6.6",
     "react-native-fs": "^2.20.0",
     "react-native-sound": "^0.11.2",
+    "react-native-vector-icons": "^10.0.3",
     "react-native-zip-archive": "^6.1.0",
     "whisper.rn": "^0.3.9"
   },
   "devDependencies": {
     "@babel/core": "^7.23.9",
     "@babel/preset-env": "^7.23.8",
-    "@babel/runtime": "^7.23.9"
+    "@babel/runtime": "^7.23.9",
+    "@types/react-native-vector-icons": "^6.4.18"
   }
 }

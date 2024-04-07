@@ -1,23 +1,25 @@
-import React, { useCallback, useState } from 'react'
+import FontAwesome from 'react-native-vector-icons/FontAwesome'
+import React from 'react'
+// import React, { useCallback, useState } from 'react'
 import {
   StyleSheet,
   ScrollView,
   View,
-  Text,
+  // Text,
   TouchableOpacity,
   SafeAreaView,
   Platform,
   PermissionsAndroid,
+  TextInput,
 } from 'react-native'
 import RNFS from 'react-native-fs'
-import { unzip } from 'react-native-zip-archive'
-import Sound from 'react-native-sound'
-import { initWhisper, libVersion, AudioSessionIos } from '../../src' // whisper.rn
-import type { WhisperContext } from '../../src'
-import contextOpts from './context-opts'
-import VoiceRecorder from './VoiceRecorder'
-
-const sampleFile = require('../assets/jfk.wav')
+// import { unzip } from 'react-native-zip-archive'
+// import Sound from 'react-native-sound'
+// import { initWhisper, libVersion, AudioSessionIos } from '../../src' // whisper.rn
+// import type { WhisperContext } from '../../src'
+// import contextOpts from './context-opts'
+// import VoiceRecorder from './VoiceRecorder'
+// const sampleFile = require('../assets/jfk.wav')
 
 if (Platform.OS === 'android') {
   // Request record audio permission
@@ -36,8 +38,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 4,
+    justifyContent: 'flex-start',
+    padding: 10,
   },
   buttons: { flexDirection: 'row' },
   button: { margin: 4, backgroundColor: '#333', borderRadius: 4, padding: 8 },
@@ -51,77 +53,106 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   logText: { fontSize: 12, color: '#333' },
+
+  // My styles
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  searchInput: {
+    flex: 1,
+    height: 50,
+    borderRadius: 50,
+    backgroundColor: '#fff',
+    paddingLeft: 20,
+    borderColor: '#ddd',
+    borderWidth: 1,
+    fontSize: 16,
+  },
+  circleButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 10,
+    backgroundColor: '#fff',
+    borderColor: '#ddd',
+    borderWidth: 1,
+  },
 })
 
-function toTimestamp(t: number, comma = false) {
-  let msec = t * 10
-  const hr = Math.floor(msec / (1000 * 60 * 60))
-  msec -= hr * (1000 * 60 * 60)
-  const min = Math.floor(msec / (1000 * 60))
-  msec -= min * (1000 * 60)
-  const sec = Math.floor(msec / 1000)
-  msec -= sec * 1000
+// function toTimestamp(t: number, comma = false) {
+//   let msec = t * 10
+//   const hr = Math.floor(msec / (1000 * 60 * 60))
+//   msec -= hr * (1000 * 60 * 60)
+//   const min = Math.floor(msec / (1000 * 60))
+//   msec -= min * (1000 * 60)
+//   const sec = Math.floor(msec / 1000)
+//   msec -= sec * 1000
 
-  const separator = comma ? ',' : '.'
-  const timestamp = `${String(hr).padStart(2, '0')}:${String(min).padStart(
-    2,
-    '0',
-  )}:${String(sec).padStart(2, '0')}${separator}${String(msec).padStart(
-    3,
-    '0',
-  )}`
+//   const separator = comma ? ',' : '.'
+//   const timestamp = `${String(hr).padStart(2, '0')}:${String(min).padStart(
+//     2,
+//     '0',
+//   )}:${String(sec).padStart(2, '0')}${separator}${String(msec).padStart(
+//     3,
+//     '0',
+//   )}`
 
-  return timestamp
-}
+//   return timestamp
+// }
 
-const mode = process.env.NODE_ENV === 'development' ? 'debug' : 'release'
+// const mode = process.env.NODE_ENV === 'development' ? 'debug' : 'release'
 
 const fileDir = `${RNFS.DocumentDirectoryPath}/whisper`
 
 console.log('[App] fileDir', fileDir)
 
-const recordFile = `${fileDir}/realtime.wav`
+// const recordFile = `${fileDir}/realtime.wav`
 
-const modelHost = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main'
+// const modelHost = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main'
 
-const createDir = async (log: any) => {
-  if (!(await RNFS.exists(fileDir))) {
-    log('Create dir', fileDir)
-    await RNFS.mkdir(fileDir)
-  }
-}
+// const createDir = async (log: any) => {
+//   if (!(await RNFS.exists(fileDir))) {
+//     log('Create dir', fileDir)
+//     await RNFS.mkdir(fileDir)
+//   }
+// }
 
-const filterPath = (path: string) =>
-  path.replace(RNFS.DocumentDirectoryPath, '<DocumentDir>')
+// const filterPath = (path: string) =>
+//   path.replace(RNFS.DocumentDirectoryPath, '<DocumentDir>')
 
 export default function App() {
-  const [whisperContext, setWhisperContext] = useState<WhisperContext | null>(
-    null,
-  )
-  const [logs, setLogs] = useState([`whisper.cpp version: ${libVersion}`])
-  const [transcibeResult, setTranscibeResult] = useState<string | null>(null)
-  const [stopTranscribe, setStopTranscribe] = useState<{
-    stop: () => void
-  } | null>(null)
-  const [recordedFilePath, setRecordedFilePath] = useState<string | null>(null)
+  // const [whisperContext, setWhisperContext] = useState<WhisperContext | null>(
+  //   null,
+  // )
+  // const [logs, setLogs] = useState([`whisper.cpp version: ${libVersion}`])
+  // const [transcibeResult, setTranscibeResult] = useState<string | null>(null)
+  // const [stopTranscribe, setStopTranscribe] = useState<{
+  //   stop: () => void
+  // } | null>(null)
+  // const [recordedFilePath, setRecordedFilePath] = useState<string | null>(null)
 
-  const log = useCallback((...messages: any[]) => {
-    setLogs((prev) => [...prev, messages.join(' ')])
-  }, [])
+  // const log = useCallback((...messages: any[]) => {
+  //   setLogs((prev) => [...prev, messages.join(' ')])
+  // }, [])
 
-  const progress = useCallback(
-    ({
-      contentLength,
-      bytesWritten,
-    }: {
-      contentLength: number
-      bytesWritten: number
-    }) => {
-      const written = bytesWritten >= 0 ? bytesWritten : 0
-      log(`Download progress: ${Math.round((written / contentLength) * 100)}%`)
-    },
-    [log],
-  )
+  // const progress = useCallback(
+  //   ({
+  //     contentLength,
+  //     bytesWritten,
+  //   }: {
+  //     contentLength: number
+  //     bytesWritten: number
+  //   }) => {
+  //     const written = bytesWritten >= 0 ? bytesWritten : 0
+  //     log(`Download progress: ${Math.round((written / contentLength) * 100)}%`)
+  //   },
+  //   [log],
+  // )
 
   return (
     <ScrollView
@@ -129,7 +160,16 @@ export default function App() {
       contentContainerStyle={styles.scrollview}
     >
       <SafeAreaView style={styles.container}>
-        <View style={styles.buttons}>
+        <View style={styles.topBar}>
+          <TextInput style={styles.searchInput} placeholder="Search..." />
+          <TouchableOpacity style={styles.circleButton}>
+            <FontAwesome name="upload" size={25} color="#182F59" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.circleButton}>
+            <FontAwesome name="gear" size={25} color="#182F59" />
+          </TouchableOpacity>
+        </View>
+        {/* <View style={styles.buttons}>
           <VoiceRecorder onRecorded={setRecordedFilePath} />
         </View>
         <View style={styles.buttons}>
@@ -454,7 +494,7 @@ export default function App() {
           }}
         >
           <Text style={styles.buttonText}>Play Recorded file</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </SafeAreaView>
     </ScrollView>
   )
