@@ -1,24 +1,27 @@
 import FontAwesome from 'react-native-vector-icons/FontAwesome'
-import React from 'react'
+import React, { useCallback, useState } from 'react'
 // import React, { useCallback, useState } from 'react'
 import {
   StyleSheet,
   ScrollView,
   View,
-  // Text,
   TouchableOpacity,
   SafeAreaView,
   Platform,
   PermissionsAndroid,
   TextInput,
+  Text,
 } from 'react-native'
 import RNFS from 'react-native-fs'
+import AudioRecorderPlayer from 'react-native-audio-recorder-player'
+
+const audioRecorderPlayer = new AudioRecorderPlayer()
+
 // import { unzip } from 'react-native-zip-archive'
 // import Sound from 'react-native-sound'
 // import { initWhisper, libVersion, AudioSessionIos } from '../../src' // whisper.rn
 // import type { WhisperContext } from '../../src'
 // import contextOpts from './context-opts'
-// import VoiceRecorder from './VoiceRecorder'
 // const sampleFile = require('../assets/jfk.wav')
 
 if (Platform.OS === 'android') {
@@ -81,6 +84,34 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderColor: '#ddd',
     borderWidth: 1,
+  },
+  bottomBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 60,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+    borderColor: '#ddd',
+    borderWidth: 1,
+  },
+  micButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#182F59',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recordingsList: {
+    flex: 1,
+    marginTop: 10,
+    marginBottom: 70,
   },
 })
 
@@ -154,348 +185,434 @@ export default function App() {
   //   [log],
   // )
 
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordings, setRecordings] = useState<string[]>([])
+
+  const onStartRecord = async () => {
+    const dirPath = `${RNFS.DocumentDirectoryPath}/whisper`
+    const isDirExist = await RNFS.exists(dirPath)
+    if (!isDirExist) {
+      await RNFS.mkdir(dirPath)
+    }
+    const fileName = `recording${recordings.length + 1}.mp3`
+    const path = `${dirPath}/${fileName}`
+
+    const result = await audioRecorderPlayer.startRecorder(path)
+    setIsRecording(true)
+    console.log(result)
+  }
+
+  const onStopRecord = async () => {
+    const result = await audioRecorderPlayer.stopRecorder()
+    setIsRecording(false)
+    const path = `${RNFS.DocumentDirectoryPath}/whisper/recording${recordings.length}.mp3`
+    setRecordings((prevRecordings) => [...prevRecordings, path])
+    console.log(result)
+  }
+
+  const handleMicPress = useCallback(() => {
+    if (isRecording) {
+      onStopRecord()
+    } else {
+      onStartRecord()
+    }
+  }, [isRecording])
+
   return (
-    <ScrollView
-      contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={styles.scrollview}
-    >
-      <SafeAreaView style={styles.container}>
-        <View style={styles.topBar}>
-          <TextInput style={styles.searchInput} placeholder="Search..." />
-          <TouchableOpacity style={styles.circleButton}>
-            <FontAwesome name="upload" size={25} color="#182F59" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.circleButton}>
-            <FontAwesome name="gear" size={25} color="#182F59" />
-          </TouchableOpacity>
-        </View>
-        {/* <View style={styles.buttons}>
-          <VoiceRecorder onRecorded={setRecordedFilePath} />
-        </View>
-        <View style={styles.buttons}>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={async () => {
-              if (whisperContext) {
-                log('Found previous context')
-                await whisperContext.release()
-                setWhisperContext(null)
-                log('Released previous context')
-              }
-              log('Initialize context...')
-              const startTime = Date.now()
-              const ctx = await initWhisper({
-                filePath: require('../assets/ggml-tiny.en.bin'),
-                ...contextOpts,
-              })
-              const endTime = Date.now()
-              log('Loaded model, ID:', ctx.id)
-              log('Loaded model in', endTime - startTime, `ms in ${mode} mode`)
-              setWhisperContext(ctx)
-            }}
-          >
-            <Text style={styles.buttonText}>Initialize (Use Asset)</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={async () => {
-              if (whisperContext) {
-                log('Found previous context')
-                await whisperContext.release()
-                setWhisperContext(null)
-                log('Released previous context')
-              }
-              await createDir(log)
-              const modelFilePath = `${fileDir}/ggml-base.bin`
-              if (await RNFS.exists(modelFilePath)) {
-                log('Model already exists:')
-                log(filterPath(modelFilePath))
-              } else {
-                log('Start Download Model to:')
-                log(filterPath(modelFilePath))
-                await RNFS.downloadFile({
-                  fromUrl: `${modelHost}/ggml-base.bin`,
-                  toFile: modelFilePath,
-                  progressInterval: 1000,
-                  begin: () => {},
-                  progress,
-                }).promise
-                log('Downloaded model file:')
-                log(filterPath(modelFilePath))
-              }
-
-              // If you don't want to enable Core ML, you can remove this
-              const coremlModelFilePath = `${fileDir}/ggml-base-encoder.mlmodelc.zip`
-              if (
-                Platform.OS === 'ios' &&
-                (await RNFS.exists(coremlModelFilePath))
-              ) {
-                log('Core ML Model already exists:')
-                log(filterPath(coremlModelFilePath))
-              } else if (Platform.OS === 'ios') {
-                log('Start Download Core ML Model to:')
-                log(filterPath(coremlModelFilePath))
-                await RNFS.downloadFile({
-                  fromUrl: `${modelHost}/ggml-base-encoder.mlmodelc.zip`,
-                  toFile: coremlModelFilePath,
-                  progressInterval: 1000,
-                  begin: () => {},
-                  progress,
-                }).promise
-                log('Downloaded Core ML Model model file:')
-                log(filterPath(modelFilePath))
-                await unzip(coremlModelFilePath, fileDir)
-                log('Unzipped Core ML Model model successfully.')
-              }
-
-              log('Initialize context...')
-              const startTime = Date.now()
-              const ctx = await initWhisper({ filePath: modelFilePath })
-              const endTime = Date.now()
-              log('Loaded model, ID:', ctx.id)
-              log('Loaded model in', endTime - startTime, `ms in ${mode} mode`)
-              setWhisperContext(ctx)
-            }}
-          >
-            <Text style={styles.buttonText}>Initialize (Download)</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.buttons}>
-          <TouchableOpacity
-            style={styles.button}
-            disabled={!!stopTranscribe?.stop}
-            onPress={async () => {
-              if (!whisperContext) return log('No context')
-
-              log('Start transcribing...')
-              const startTime = Date.now()
-              const { stop, promise } = whisperContext.transcribe(sampleFile, {
-                maxLen: 1,
-                tokenTimestamps: true,
-                onProgress: (cur) => {
-                  log(`Transcribing progress: ${cur}%`)
-                },
-                language: 'en',
-                // prompt: 'HELLO WORLD',
-                // onNewSegments: (segments) => {
-                //   console.log('New segments:', segments)
-                // },
-              })
-              setStopTranscribe({ stop })
-              const { result, segments } = await promise
-              const endTime = Date.now()
-              setStopTranscribe(null)
-              setTranscibeResult(
-                `Transcribed result: ${result}\n` +
-                  `Transcribed in ${endTime - startTime}ms in ${mode} mode` +
-                  `\n` +
-                  `Segments:` +
-                  `\n${segments
-                    .map(
-                      (segment) =>
-                        `[${toTimestamp(segment.t0)} --> ${toTimestamp(
-                          segment.t1,
-                        )}]  ${segment.text}`,
-                    )
-                    .join('\n')}`,
-              )
-              log('Finished transcribing')
-            }}
-          >
-            <Text style={styles.buttonText}>Transcribe File</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.button}
-            disabled={!!stopTranscribe?.stop || !recordedFilePath}
-            onPress={async () => {
-              if (!whisperContext || !recordedFilePath)
-                return log('No context or no recorded file')
-
-              log('Start transcribing...')
-              const startTime = Date.now()
-              const { stop, promise } = whisperContext.transcribe(
-                recordedFilePath,
-                {
-                  maxLen: 1,
-                  tokenTimestamps: true,
-                  onProgress: (cur) => {
-                    log(`Transcribing progress: ${cur}%`)
-                  },
-                  language: 'en',
-                  // prompt: 'HELLO WORLD',
-                  // onNewSegments: (segments) => {
-                  //   console.log('New segments:', segments)
-                  // },
-                },
-              )
-              setStopTranscribe({ stop })
-              const { result, segments } = await promise
-              const endTime = Date.now()
-              setStopTranscribe(null)
-              setTranscibeResult(
-                `Transcribed result: ${result}\n` +
-                  `Transcribed in ${endTime - startTime}ms in ${mode} mode` +
-                  `\n` +
-                  `Segments:` +
-                  `\n${segments
-                    .map(
-                      (segment) =>
-                        `[${toTimestamp(segment.t0)} --> ${toTimestamp(
-                          segment.t1,
-                        )}]  ${segment.text}`,
-                    )
-                    .join('\n')}`,
-              )
-              log('Finished transcribing')
-            }}
-          >
-            <Text style={styles.buttonText}>Transcribe Recorded File</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.button,
-              stopTranscribe?.stop ? styles.buttonClear : null,
-            ]}
-            onPress={async () => {
-              if (!whisperContext) return log('No context')
-              if (stopTranscribe?.stop) {
-                const t0 = Date.now()
-                await stopTranscribe?.stop()
-                const t1 = Date.now()
-                log('Stopped transcribing in', t1 - t0, 'ms')
-                setStopTranscribe(null)
-                return
-              }
-              log('Start realtime transcribing...')
-              try {
-                await createDir(log)
-                const { stop, subscribe } =
-                  await whisperContext.transcribeRealtime({
-                    maxLen: 1,
-                    language: 'en',
-                    // Enable beam search (may be slower than greedy but more accurate)
-                    // beamSize: 2,
-                    // Record duration in seconds
-                    realtimeAudioSec: 60,
-                    // Slice audio into 25 (or < 30) sec chunks for better performance
-                    realtimeAudioSliceSec: 25,
-                    // Save audio on stop
-                    audioOutputPath: recordFile,
-                    // iOS Audio Session
-                    audioSessionOnStartIos: {
-                      category: AudioSessionIos.Category.PlayAndRecord,
-                      options: [
-                        AudioSessionIos.CategoryOption.MixWithOthers,
-                        AudioSessionIos.CategoryOption.AllowBluetooth,
-                      ],
-                      mode: AudioSessionIos.Mode.Default,
-                    },
-                    audioSessionOnStopIos: 'restore', // Or an AudioSessionSettingIos
-                    // Voice Activity Detection - Start transcribing when speech is detected
-                    // useVad: true,
-                  })
-                setStopTranscribe({ stop })
-                subscribe((evt) => {
-                  const { isCapturing, data, processTime, recordingTime } = evt
-                  setTranscibeResult(
-                    `Realtime transcribing: ${isCapturing ? 'ON' : 'OFF'}\n` +
-                      `Result: ${data?.result}\n\n` +
-                      `Process time: ${processTime}ms\n` +
-                      `Recording time: ${recordingTime}ms` +
-                      `\n` +
-                      `Segments:` +
-                      `\n${data?.segments
-                        .map(
-                          (segment) =>
-                            `[${toTimestamp(segment.t0)} --> ${toTimestamp(
-                              segment.t1,
-                            )}]  ${segment.text}`,
-                        )
-                        .join('\n')}`,
-                  )
-                  if (!isCapturing) {
-                    setStopTranscribe(null)
-                    log('Finished realtime transcribing')
-                  }
-                })
-              } catch (e) {
-                log('Error:', e)
-              }
-            }}
-          >
-            <Text style={styles.buttonText}>
-              {stopTranscribe?.stop ? 'Stop' : 'Realtime'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.logContainer}>
-          {logs.map((msg, index) => (
-            <Text key={index} style={styles.logText}>
-              {msg}
-            </Text>
-          ))}
-        </View>
-        {transcibeResult && (
-          <View style={styles.logContainer}>
-            <Text style={styles.logText}>{transcibeResult}</Text>
-          </View>
-        )}
-
-        <TouchableOpacity
-          style={[styles.button, styles.buttonClear]}
-          onPress={async () => {
-            if (!whisperContext) return
-            await whisperContext.release()
-            setWhisperContext(null)
-            log('Released context')
-          }}
-        >
-          <Text style={styles.buttonText}>Release Context</Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.topBar}>
+        <TextInput style={styles.searchInput} placeholder="Search recordings" />
+        <TouchableOpacity style={styles.circleButton}>
+          <FontAwesome name="upload" size={25} color="#182F59" />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, styles.buttonClear]}
-          onPress={() => {
-            setLogs([])
-            setTranscibeResult('')
-          }}
-        >
-          <Text style={styles.buttonText}>Clear Logs</Text>
+        <TouchableOpacity style={styles.circleButton}>
+          <FontAwesome name="gear" size={25} color="#182F59" />
         </TouchableOpacity>
+      </View>
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={styles.scrollview}
+        style={styles.recordingsList}
+      >
+        {recordings.map((recording, index) => (
+          <Text key={index}>{recording}</Text>
+        ))}
+      </ScrollView>
+      <View style={styles.bottomBar}>
         <TouchableOpacity
-          style={[styles.button, styles.buttonClear]}
-          onPress={async () => {
-            await RNFS.unlink(fileDir).catch(() => {})
-            log('Deleted files')
-          }}
+          style={[styles.micButton, { zIndex: 1 }]}
+          onPress={handleMicPress}
         >
-          <Text style={styles.buttonText}>Clear Download files</Text>
+          <FontAwesome
+            name={isRecording ? 'stop' : 'microphone'}
+            size={25}
+            color="#FFFFFF"
+          />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, styles.buttonClear]}
-          onPress={async () => {
-            if (!(await RNFS.exists(recordFile))) {
-              log('Recorded file does not exist')
-              return
-            }
-            const player = new Sound(recordFile, '', (e) => {
-              if (e) {
-                log('error', e)
-                return
-              }
-              player.play((success) => {
-                if (success) {
-                  log('successfully finished playing')
-                } else {
-                  log('playback failed due to audio decoding errors')
-                }
-                player.release()
-              })
-            })
-          }}
-        >
-          <Text style={styles.buttonText}>Play Recorded file</Text>
-        </TouchableOpacity> */}
-      </SafeAreaView>
-    </ScrollView>
+      </View>
+    </SafeAreaView>
   )
 }
+
+//   <ScrollView
+//     contentInsetAdjustmentBehavior="automatic"
+//     contentContainerStyle={styles.scrollview}
+//   >
+//     <SafeAreaView style={styles.container}>
+//       <View style={styles.topBar}>
+//         <TextInput
+//           style={styles.searchInput}
+//           placeholder="Search recordings"
+//         />
+//         <TouchableOpacity style={styles.circleButton}>
+//           <FontAwesome name="upload" size={25} color="#182F59" />
+//         </TouchableOpacity>
+//         <TouchableOpacity style={styles.circleButton}>
+//           <FontAwesome name="gear" size={25} color="#182F59" />
+//         </TouchableOpacity>
+//       </View>
+//       <ScrollView style={styles.recordingsList}>
+//         {recordings.map((recording, index) => (
+//           <Text key={index}>{recording}</Text>
+//         ))}
+//       </ScrollView>
+//       <View style={styles.bottomBar}>
+//         <TouchableOpacity
+//           style={[styles.micButton, { zIndex: 1 }]}
+//           onPress={handleMicPress}
+//         >
+//           <FontAwesome
+//             name={isRecording ? 'stop' : 'microphone'}
+//             size={25}
+//             color="#FFFFFF"
+//           />
+//         </TouchableOpacity>
+//       </View>
+//       {/* <View style={styles.buttons}>
+//         <VoiceRecorder onRecorded={setRecordedFilePath} />
+//       </View>
+//       <View style={styles.buttons}>
+//         <TouchableOpacity
+//           style={styles.button}
+//           onPress={async () => {
+//             if (whisperContext) {
+//               log('Found previous context')
+//               await whisperContext.release()
+//               setWhisperContext(null)
+//               log('Released previous context')
+//             }
+//             log('Initialize context...')
+//             const startTime = Date.now()
+//             const ctx = await initWhisper({
+//               filePath: require('../assets/ggml-tiny.en.bin'),
+//               ...contextOpts,
+//             })
+//             const endTime = Date.now()
+//             log('Loaded model, ID:', ctx.id)
+//             log('Loaded model in', endTime - startTime, `ms in ${mode} mode`)
+//             setWhisperContext(ctx)
+//           }}
+//         >
+//           <Text style={styles.buttonText}>Initialize (Use Asset)</Text>
+//         </TouchableOpacity>
+//         <TouchableOpacity
+//           style={styles.button}
+//           onPress={async () => {
+//             if (whisperContext) {
+//               log('Found previous context')
+//               await whisperContext.release()
+//               setWhisperContext(null)
+//               log('Released previous context')
+//             }
+//             await createDir(log)
+//             const modelFilePath = `${fileDir}/ggml-base.bin`
+//             if (await RNFS.exists(modelFilePath)) {
+//               log('Model already exists:')
+//               log(filterPath(modelFilePath))
+//             } else {
+//               log('Start Download Model to:')
+//               log(filterPath(modelFilePath))
+//               await RNFS.downloadFile({
+//                 fromUrl: `${modelHost}/ggml-base.bin`,
+//                 toFile: modelFilePath,
+//                 progressInterval: 1000,
+//                 begin: () => {},
+//                 progress,
+//               }).promise
+//               log('Downloaded model file:')
+//               log(filterPath(modelFilePath))
+//             }
+
+//             // If you don't want to enable Core ML, you can remove this
+//             const coremlModelFilePath = `${fileDir}/ggml-base-encoder.mlmodelc.zip`
+//             if (
+//               Platform.OS === 'ios' &&
+//               (await RNFS.exists(coremlModelFilePath))
+//             ) {
+//               log('Core ML Model already exists:')
+//               log(filterPath(coremlModelFilePath))
+//             } else if (Platform.OS === 'ios') {
+//               log('Start Download Core ML Model to:')
+//               log(filterPath(coremlModelFilePath))
+//               await RNFS.downloadFile({
+//                 fromUrl: `${modelHost}/ggml-base-encoder.mlmodelc.zip`,
+//                 toFile: coremlModelFilePath,
+//                 progressInterval: 1000,
+//                 begin: () => {},
+//                 progress,
+//               }).promise
+//               log('Downloaded Core ML Model model file:')
+//               log(filterPath(modelFilePath))
+//               await unzip(coremlModelFilePath, fileDir)
+//               log('Unzipped Core ML Model model successfully.')
+//             }
+
+//             log('Initialize context...')
+//             const startTime = Date.now()
+//             const ctx = await initWhisper({ filePath: modelFilePath })
+//             const endTime = Date.now()
+//             log('Loaded model, ID:', ctx.id)
+//             log('Loaded model in', endTime - startTime, `ms in ${mode} mode`)
+//             setWhisperContext(ctx)
+//           }}
+//         >
+//           <Text style={styles.buttonText}>Initialize (Download)</Text>
+//         </TouchableOpacity>
+//       </View>
+//       <View style={styles.buttons}>
+//         <TouchableOpacity
+//           style={styles.button}
+//           disabled={!!stopTranscribe?.stop}
+//           onPress={async () => {
+//             if (!whisperContext) return log('No context')
+
+//             log('Start transcribing...')
+//             const startTime = Date.now()
+//             const { stop, promise } = whisperContext.transcribe(sampleFile, {
+//               maxLen: 1,
+//               tokenTimestamps: true,
+//               onProgress: (cur) => {
+//                 log(`Transcribing progress: ${cur}%`)
+//               },
+//               language: 'en',
+//               // prompt: 'HELLO WORLD',
+//               // onNewSegments: (segments) => {
+//               //   console.log('New segments:', segments)
+//               // },
+//             })
+//             setStopTranscribe({ stop })
+//             const { result, segments } = await promise
+//             const endTime = Date.now()
+//             setStopTranscribe(null)
+//             setTranscibeResult(
+//               `Transcribed result: ${result}\n` +
+//                 `Transcribed in ${endTime - startTime}ms in ${mode} mode` +
+//                 `\n` +
+//                 `Segments:` +
+//                 `\n${segments
+//                   .map(
+//                     (segment) =>
+//                       `[${toTimestamp(segment.t0)} --> ${toTimestamp(
+//                         segment.t1,
+//                       )}]  ${segment.text}`,
+//                   )
+//                   .join('\n')}`,
+//             )
+//             log('Finished transcribing')
+//           }}
+//         >
+//           <Text style={styles.buttonText}>Transcribe File</Text>
+//         </TouchableOpacity>
+//         <TouchableOpacity
+//           style={styles.button}
+//           disabled={!!stopTranscribe?.stop || !recordedFilePath}
+//           onPress={async () => {
+//             if (!whisperContext || !recordedFilePath)
+//               return log('No context or no recorded file')
+
+//             log('Start transcribing...')
+//             const startTime = Date.now()
+//             const { stop, promise } = whisperContext.transcribe(
+//               recordedFilePath,
+//               {
+//                 maxLen: 1,
+//                 tokenTimestamps: true,
+//                 onProgress: (cur) => {
+//                   log(`Transcribing progress: ${cur}%`)
+//                 },
+//                 language: 'en',
+//                 // prompt: 'HELLO WORLD',
+//                 // onNewSegments: (segments) => {
+//                 //   console.log('New segments:', segments)
+//                 // },
+//               },
+//             )
+//             setStopTranscribe({ stop })
+//             const { result, segments } = await promise
+//             const endTime = Date.now()
+//             setStopTranscribe(null)
+//             setTranscibeResult(
+//               `Transcribed result: ${result}\n` +
+//                 `Transcribed in ${endTime - startTime}ms in ${mode} mode` +
+//                 `\n` +
+//                 `Segments:` +
+//                 `\n${segments
+//                   .map(
+//                     (segment) =>
+//                       `[${toTimestamp(segment.t0)} --> ${toTimestamp(
+//                         segment.t1,
+//                       )}]  ${segment.text}`,
+//                   )
+//                   .join('\n')}`,
+//             )
+//             log('Finished transcribing')
+//           }}
+//         >
+//           <Text style={styles.buttonText}>Transcribe Recorded File</Text>
+//         </TouchableOpacity>
+//         <TouchableOpacity
+//           style={[
+//             styles.button,
+//             stopTranscribe?.stop ? styles.buttonClear : null,
+//           ]}
+//           onPress={async () => {
+//             if (!whisperContext) return log('No context')
+//             if (stopTranscribe?.stop) {
+//               const t0 = Date.now()
+//               await stopTranscribe?.stop()
+//               const t1 = Date.now()
+//               log('Stopped transcribing in', t1 - t0, 'ms')
+//               setStopTranscribe(null)
+//               return
+//             }
+//             log('Start realtime transcribing...')
+//             try {
+//               await createDir(log)
+//               const { stop, subscribe } =
+//                 await whisperContext.transcribeRealtime({
+//                   maxLen: 1,
+//                   language: 'en',
+//                   // Enable beam search (may be slower than greedy but more accurate)
+//                   // beamSize: 2,
+//                   // Record duration in seconds
+//                   realtimeAudioSec: 60,
+//                   // Slice audio into 25 (or < 30) sec chunks for better performance
+//                   realtimeAudioSliceSec: 25,
+//                   // Save audio on stop
+//                   audioOutputPath: recordFile,
+//                   // iOS Audio Session
+//                   audioSessionOnStartIos: {
+//                     category: AudioSessionIos.Category.PlayAndRecord,
+//                     options: [
+//                       AudioSessionIos.CategoryOption.MixWithOthers,
+//                       AudioSessionIos.CategoryOption.AllowBluetooth,
+//                     ],
+//                     mode: AudioSessionIos.Mode.Default,
+//                   },
+//                   audioSessionOnStopIos: 'restore', // Or an AudioSessionSettingIos
+//                   // Voice Activity Detection - Start transcribing when speech is detected
+//                   // useVad: true,
+//                 })
+//               setStopTranscribe({ stop })
+//               subscribe((evt) => {
+//                 const { isCapturing, data, processTime, recordingTime } = evt
+//                 setTranscibeResult(
+//                   `Realtime transcribing: ${isCapturing ? 'ON' : 'OFF'}\n` +
+//                     `Result: ${data?.result}\n\n` +
+//                     `Process time: ${processTime}ms\n` +
+//                     `Recording time: ${recordingTime}ms` +
+//                     `\n` +
+//                     `Segments:` +
+//                     `\n${data?.segments
+//                       .map(
+//                         (segment) =>
+//                           `[${toTimestamp(segment.t0)} --> ${toTimestamp(
+//                             segment.t1,
+//                           )}]  ${segment.text}`,
+//                       )
+//                       .join('\n')}`,
+//                 )
+//                 if (!isCapturing) {
+//                   setStopTranscribe(null)
+//                   log('Finished realtime transcribing')
+//                 }
+//               })
+//             } catch (e) {
+//               log('Error:', e)
+//             }
+//           }}
+//         >
+//           <Text style={styles.buttonText}>
+//             {stopTranscribe?.stop ? 'Stop' : 'Realtime'}
+//           </Text>
+//         </TouchableOpacity>
+//       </View>
+//       <View style={styles.logContainer}>
+//         {logs.map((msg, index) => (
+//           <Text key={index} style={styles.logText}>
+//             {msg}
+//           </Text>
+//         ))}
+//       </View>
+//       {transcibeResult && (
+//         <View style={styles.logContainer}>
+//           <Text style={styles.logText}>{transcibeResult}</Text>
+//         </View>
+//       )}
+
+//       <TouchableOpacity
+//         style={[styles.button, styles.buttonClear]}
+//         onPress={async () => {
+//           if (!whisperContext) return
+//           await whisperContext.release()
+//           setWhisperContext(null)
+//           log('Released context')
+//         }}
+//       >
+//         <Text style={styles.buttonText}>Release Context</Text>
+//       </TouchableOpacity>
+//       <TouchableOpacity
+//         style={[styles.button, styles.buttonClear]}
+//         onPress={() => {
+//           setLogs([])
+//           setTranscibeResult('')
+//         }}
+//       >
+//         <Text style={styles.buttonText}>Clear Logs</Text>
+//       </TouchableOpacity>
+//       <TouchableOpacity
+//         style={[styles.button, styles.buttonClear]}
+//         onPress={async () => {
+//           await RNFS.unlink(fileDir).catch(() => {})
+//           log('Deleted files')
+//         }}
+//       >
+//         <Text style={styles.buttonText}>Clear Download files</Text>
+//       </TouchableOpacity>
+//       <TouchableOpacity
+//         style={[styles.button, styles.buttonClear]}
+//         onPress={async () => {
+//           if (!(await RNFS.exists(recordFile))) {
+//             log('Recorded file does not exist')
+//             return
+//           }
+//           const player = new Sound(recordFile, '', (e) => {
+//             if (e) {
+//               log('error', e)
+//               return
+//             }
+//             player.play((success) => {
+//               if (success) {
+//                 log('successfully finished playing')
+//               } else {
+//                 log('playback failed due to audio decoding errors')
+//               }
+//               player.release()
+//             })
+//           })
+//         }}
+//       >
+//         <Text style={styles.buttonText}>Play Recorded file</Text>
+//       </TouchableOpacity> */}
+//     </SafeAreaView>
+//   </ScrollView>
