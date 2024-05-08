@@ -1,5 +1,5 @@
 import FontAwesome from 'react-native-vector-icons/FontAwesome'
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useState, useRef } from 'react'
 // import React, { useCallback, useState } from 'react'
 import {
   StyleSheet,
@@ -113,6 +113,20 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 70,
   },
+  timerText: {
+    fontSize: 20,
+    color: '#000',
+  },
+  recordingItem: {
+    marginBottom: 10,
+    padding: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 5,
+  },
+  recordingText: {
+    fontSize: 16,
+    color: '#000000',
+  },
 })
 
 // function toTimestamp(t: number, comma = false) {
@@ -186,7 +200,11 @@ export default function App() {
   // )
 
   const [isRecording, setIsRecording] = useState(false)
-  const [recordings, setRecordings] = useState<string[]>([])
+  const [recordings, setRecordings] = useState<
+    Array<{ name: string; path: string; date: string; duration: string }>
+  >([])
+  const recordingDuration = useRef(0)
+  const timer = useRef<NodeJS.Timeout | null>(null)
 
   const onStartRecord = async () => {
     const dirPath = `${RNFS.DocumentDirectoryPath}/whisper`
@@ -199,14 +217,37 @@ export default function App() {
 
     const result = await audioRecorderPlayer.startRecorder(path)
     setIsRecording(true)
+
+    // Start the timer
+    recordingDuration.current = 0
+    timer.current = setInterval(() => {
+      recordingDuration.current += 1
+    }, 1000)
+
     console.log(result)
   }
 
   const onStopRecord = async () => {
     const result = await audioRecorderPlayer.stopRecorder()
     setIsRecording(false)
+
     const path = `${RNFS.DocumentDirectoryPath}/whisper/recording${recordings.length}.mp3`
-    setRecordings((prevRecordings) => [...prevRecordings, path])
+
+    // Stop the timer
+    if (timer.current) {
+      clearInterval(timer.current)
+      timer.current = null
+    }
+
+    const newRecording = {
+      name: `Recording ${recordings.length + 1}`,
+      path,
+      date: new Date().toLocaleDateString(),
+      duration: recordingDuration.current.toString(),
+    }
+
+    setRecordings((prevRecordings) => [...prevRecordings, newRecording])
+    recordingDuration.current = 0
     console.log(result)
   }
 
@@ -216,7 +257,7 @@ export default function App() {
     } else {
       onStartRecord()
     }
-  }, [isRecording])
+  }, [isRecording, onStartRecord, onStopRecord])
 
   return (
     <SafeAreaView style={styles.container}>
@@ -231,11 +272,32 @@ export default function App() {
       </View>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.scrollview}
+        contentContainerStyle={{
+          ...styles.scrollview,
+          justifyContent: 'flex-start',
+        }}
         style={styles.recordingsList}
       >
         {recordings.map((recording, index) => (
-          <Text key={index}>{recording}</Text>
+          <View key={index} style={styles.recordingItem}>
+            <Text style={styles.recordingText}>
+              {'Name: '}
+              {recording.name}
+            </Text>
+            <Text style={styles.recordingText}>
+              {'Path: '}
+              {recording.path}
+            </Text>
+            <Text style={styles.recordingText}>
+              {'Date: '}
+              {recording.date}
+            </Text>
+            <Text style={styles.recordingText}>
+              {'Duration: '}
+              {recording.duration}
+              {' seconds'}
+            </Text>
+          </View>
         ))}
       </ScrollView>
       <View style={styles.bottomBar}>
