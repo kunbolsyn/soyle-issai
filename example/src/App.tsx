@@ -257,7 +257,7 @@ export default function App() {
     } else {
       onStartRecord()
     }
-  }, [isRecording, onStartRecord, onStopRecord])
+  }, [isRecording])
 
   return (
     <SafeAreaView style={styles.container}>
