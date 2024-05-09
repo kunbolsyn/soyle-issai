@@ -40,7 +40,7 @@ const styles = StyleSheet.create({
   scrollview: { flexGrow: 1, justifyContent: 'center' },
   container: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: 'stretch',
     justifyContent: 'flex-start',
     padding: 10,
   },
@@ -113,19 +113,29 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 70,
   },
-  timerText: {
-    fontSize: 20,
-    color: '#000',
-  },
   recordingItem: {
     marginBottom: 10,
-    padding: 10,
+    padding: 15,
     backgroundColor: '#FFFFFF',
-    borderRadius: 5,
+    borderRadius: 10,
+    borderColor: '#ddd',
+    borderWidth: 1,
+    width: '100%',
   },
-  recordingText: {
+  recordingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  recordingName: {
     fontSize: 16,
-    color: '#000000',
+    fontWeight: 'bold',
+    color: '#182F59',
+  },
+  recordingDetails: {
+    fontSize: 16,
+    color: 'grey',
   },
 })
 
@@ -277,23 +287,20 @@ export default function App() {
           justifyContent: 'flex-start',
         }}
         style={styles.recordingsList}
+        showsVerticalScrollIndicator={false}
       >
         {recordings.map((recording, index) => (
           <View key={index} style={styles.recordingItem}>
-            <Text style={styles.recordingText}>
-              {'Name: '}
-              {recording.name}
-            </Text>
-            <Text style={styles.recordingText}>
-              {'Path: '}
-              {recording.path}
-            </Text>
-            <Text style={styles.recordingText}>
+            <View style={styles.recordingHeader}>
+              <Text style={styles.recordingName}>{recording.name}</Text>
+              <TouchableOpacity onPress={() => {}}>
+                <FontAwesome name="ellipsis-v" size={20} color="#182F59" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.recordingDetails}>
               {'Date: '}
               {recording.date}
-            </Text>
-            <Text style={styles.recordingText}>
-              {'Duration: '}
+              {' | Duration: '}
               {recording.duration}
               {' seconds'}
             </Text>
