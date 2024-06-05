@@ -1,7 +1,7 @@
 import FontAwesome from 'react-native-vector-icons/FontAwesome'
 import React, { useCallback, useState, useRef } from 'react'
-// import React, { useCallback, useState } from 'react'
 import {
+  Button,
   StyleSheet,
   ScrollView,
   View,
@@ -34,6 +34,14 @@ if (Platform.OS === 'android') {
     buttonNegative: 'Cancel',
     buttonPositive: 'OK',
   })
+}
+
+type Recording = {
+  name: string
+  path: string
+  date: string
+  duration: string
+  transcribedText?: string
 }
 
 const styles = StyleSheet.create({
@@ -180,7 +188,7 @@ console.log('[App] fileDir', fileDir)
 // const filterPath = (path: string) =>
 //   path.replace(RNFS.DocumentDirectoryPath, '<DocumentDir>')
 
-export default function App() {
+function Home({ navigateTo }: { navigateTo: (screenName: string) => void }) {
   // const [whisperContext, setWhisperContext] = useState<WhisperContext | null>(
   //   null,
   // )
@@ -209,10 +217,11 @@ export default function App() {
   //   [log],
   // )
 
+  const [selectedRecordingIndex, setSelectedRecordingIndex] = useState<
+    number | null
+  >(null)
   const [isRecording, setIsRecording] = useState(false)
-  const [recordings, setRecordings] = useState<
-    Array<{ name: string; path: string; date: string; duration: string }>
-  >([])
+  const [recordings, setRecordings] = useState<Array<Recording>>([])
   const recordingDuration = useRef(0)
   const timer = useRef<NodeJS.Timeout | null>(null)
 
@@ -249,11 +258,12 @@ export default function App() {
       timer.current = null
     }
 
-    const newRecording = {
+    const newRecording: Recording = {
       name: `Recording ${recordings.length + 1}`,
       path,
       date: new Date().toLocaleDateString(),
       duration: recordingDuration.current.toString(),
+      transcribedText: '', // Set to empty string
     }
 
     setRecordings((prevRecordings) => [...prevRecordings, newRecording])
@@ -269,6 +279,14 @@ export default function App() {
     }
   }, [isRecording])
 
+  const handleRecordingPress = (index: number) => {
+    if (selectedRecordingIndex === index) {
+      setSelectedRecordingIndex(null) // Deselect if already selected
+    } else {
+      setSelectedRecordingIndex(index) // Select the new index
+    }
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
@@ -276,7 +294,10 @@ export default function App() {
         <TouchableOpacity style={styles.circleButton}>
           <FontAwesome name="upload" size={25} color="#182F59" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.circleButton}>
+        <TouchableOpacity
+          style={styles.circleButton}
+          onPress={() => navigateTo('Settings')}
+        >
           <FontAwesome name="gear" size={25} color="#182F59" />
         </TouchableOpacity>
       </View>
@@ -290,12 +311,14 @@ export default function App() {
         showsVerticalScrollIndicator={false}
       >
         {recordings.map((recording, index) => (
-          <View key={index} style={styles.recordingItem}>
+          <TouchableOpacity
+            key={index}
+            onPress={() => handleRecordingPress(index)}
+            style={styles.recordingItem}
+          >
             <View style={styles.recordingHeader}>
               <Text style={styles.recordingName}>{recording.name}</Text>
-              <TouchableOpacity onPress={() => {}}>
-                <FontAwesome name="ellipsis-v" size={20} color="#182F59" />
-              </TouchableOpacity>
+              <FontAwesome name="ellipsis-v" size={20} color="#182F59" />
             </View>
             <Text style={styles.recordingDetails}>
               {'Date: '}
@@ -304,7 +327,15 @@ export default function App() {
               {recording.duration}
               {' seconds'}
             </Text>
-          </View>
+            {recording.transcribedText && (
+              <Text style={styles.recordingDetails}>
+                {recording.transcribedText}
+              </Text>
+            )}
+            {selectedRecordingIndex === index && (
+              <Text style={styles.recordingDetails}>Selected</Text>
+            )}
+          </TouchableOpacity>
         ))}
       </ScrollView>
       <View style={styles.bottomBar}>
@@ -323,6 +354,36 @@ export default function App() {
   )
 }
 
+function Settings({
+  navigateTo,
+}: {
+  navigateTo: (screenName: string) => void
+}) {
+  return (
+    <SafeAreaView style={styles.container}>
+      <Text>Settings</Text>
+      <Button title="Back" onPress={() => navigateTo('Home')} />
+    </SafeAreaView>
+  )
+}
+
+export default function App() {
+  const [currentScreen, setCurrentScreen] = useState('Home')
+
+  const navigateTo = (screenName: string) => {
+    setCurrentScreen(screenName)
+  }
+
+  return (
+    <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
+      contentContainerStyle={styles.scrollview}
+    >
+      {currentScreen === 'Home' && <Home navigateTo={navigateTo} />}
+      {currentScreen === 'Settings' && <Settings navigateTo={navigateTo} />}
+    </ScrollView>
+  )
+}
 //   <ScrollView
 //     contentInsetAdjustmentBehavior="automatic"
 //     contentContainerStyle={styles.scrollview}
