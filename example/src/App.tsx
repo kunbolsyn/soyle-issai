@@ -1,5 +1,5 @@
 import FontAwesome from 'react-native-vector-icons/FontAwesome'
-import React, { useCallback, useState, useRef } from 'react'
+import React, { useCallback, useState, useRef, SetStateAction } from 'react'
 import {
   Button,
   StyleSheet,
@@ -188,7 +188,13 @@ console.log('[App] fileDir', fileDir)
 // const filterPath = (path: string) =>
 //   path.replace(RNFS.DocumentDirectoryPath, '<DocumentDir>')
 
-function Home({ navigateTo }: { navigateTo: (screenName: string) => void }) {
+interface HomeProps {
+  navigateTo: (screenName: string, index?: number | null) => void
+  recordings: Recording[]
+  setRecordings: React.Dispatch<SetStateAction<Recording[]>>
+}
+
+function Home({ navigateTo, recordings, setRecordings }: HomeProps) {
   // const [whisperContext, setWhisperContext] = useState<WhisperContext | null>(
   //   null,
   // )
@@ -216,12 +222,7 @@ function Home({ navigateTo }: { navigateTo: (screenName: string) => void }) {
   //   },
   //   [log],
   // )
-
-  const [selectedRecordingIndex, setSelectedRecordingIndex] = useState<
-    number | null
-  >(null)
   const [isRecording, setIsRecording] = useState(false)
-  const [recordings, setRecordings] = useState<Array<Recording>>([])
   const recordingDuration = useRef(0)
   const timer = useRef<NodeJS.Timeout | null>(null)
 
@@ -279,14 +280,6 @@ function Home({ navigateTo }: { navigateTo: (screenName: string) => void }) {
     }
   }, [isRecording])
 
-  const handleRecordingPress = (index: number) => {
-    if (selectedRecordingIndex === index) {
-      setSelectedRecordingIndex(null) // Deselect if already selected
-    } else {
-      setSelectedRecordingIndex(index) // Select the new index
-    }
-  }
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
@@ -313,7 +306,7 @@ function Home({ navigateTo }: { navigateTo: (screenName: string) => void }) {
         {recordings.map((recording, index) => (
           <TouchableOpacity
             key={index}
-            onPress={() => handleRecordingPress(index)}
+            onPress={() => navigateTo('Recording', index)}
             style={styles.recordingItem}
           >
             <View style={styles.recordingHeader}>
@@ -331,9 +324,6 @@ function Home({ navigateTo }: { navigateTo: (screenName: string) => void }) {
               <Text style={styles.recordingDetails}>
                 {recording.transcribedText}
               </Text>
-            )}
-            {selectedRecordingIndex === index && (
-              <Text style={styles.recordingDetails}>Selected</Text>
             )}
           </TouchableOpacity>
         ))}
@@ -354,6 +344,54 @@ function Home({ navigateTo }: { navigateTo: (screenName: string) => void }) {
   )
 }
 
+interface RecordingProps {
+  navigateTo: (screenName: string, index: number | null) => void
+  recordings: Array<Recording>
+  selectedRecordingIndex: number | null
+}
+
+function Recording({
+  navigateTo,
+  recordings,
+  selectedRecordingIndex,
+}: RecordingProps) {
+  if (selectedRecordingIndex === null) {
+    return null
+  }
+  const selectedRecording = recordings[selectedRecordingIndex]
+
+  if (!selectedRecording) {
+    return null // or return some default JSX
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <Text>Recording</Text>
+      <Text>
+        Name:
+        {selectedRecording.name}
+      </Text>
+      <Text>
+        Path:
+        {selectedRecording.path}
+      </Text>
+      <Text>
+        Date:
+        {selectedRecording.date}
+      </Text>
+      <Text>
+        Duration:
+        {selectedRecording.duration}
+      </Text>
+      <Text>
+        Transcribed Text:
+        {selectedRecording.transcribedText}
+      </Text>
+      <Button title="Back" onPress={() => navigateTo('Home', null)} />
+    </SafeAreaView>
+  )
+}
+
 function Settings({
   navigateTo,
 }: {
@@ -369,9 +407,14 @@ function Settings({
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('Home')
+  const [recordings, setRecordings] = useState<Array<Recording>>([])
+  const [selectedRecordingIndex, setSelectedRecordingIndex] = useState<
+    number | null
+  >(null)
 
-  const navigateTo = (screenName: string) => {
+  const navigateTo = (screenName: string, index: number | null = null) => {
     setCurrentScreen(screenName)
+    setSelectedRecordingIndex(index)
   }
 
   return (
@@ -379,8 +422,21 @@ export default function App() {
       contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={styles.scrollview}
     >
-      {currentScreen === 'Home' && <Home navigateTo={navigateTo} />}
+      {currentScreen === 'Home' && (
+        <Home
+          navigateTo={navigateTo}
+          recordings={recordings}
+          setRecordings={setRecordings}
+        />
+      )}
       {currentScreen === 'Settings' && <Settings navigateTo={navigateTo} />}
+      {currentScreen === 'Recording' && (
+        <Recording
+          navigateTo={navigateTo}
+          recordings={recordings}
+          selectedRecordingIndex={selectedRecordingIndex}
+        />
+      )}
     </ScrollView>
   )
 }
