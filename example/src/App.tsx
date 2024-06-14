@@ -71,6 +71,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
+    marginBottom: 10,
   },
   searchInput: {
     flex: 1,
@@ -82,13 +83,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     fontSize: 16,
   },
-  circleButton: {
+  circleButtonRight: {
     width: 50,
     height: 50,
     borderRadius: 100,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 10,
+    backgroundColor: '#fff',
+    borderColor: '#ddd',
+    borderWidth: 1,
+  },
+  circleButtonLeft: {
+    width: 50,
+    height: 50,
+    borderRadius: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
     backgroundColor: '#fff',
     borderColor: '#ddd',
     borderWidth: 1,
@@ -118,7 +130,6 @@ const styles = StyleSheet.create({
   },
   recordingsList: {
     flex: 1,
-    marginTop: 10,
     marginBottom: 70,
   },
   recordingItem: {
@@ -144,6 +155,15 @@ const styles = StyleSheet.create({
   recordingDetails: {
     fontSize: 16,
     color: 'grey',
+  },
+  scrollableTextBox: {
+    flex: 1,
+    padding: 15,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderColor: '#ddd',
+    borderWidth: 1,
+    width: '100%',
   },
 })
 
@@ -284,11 +304,11 @@ function Home({ navigateTo, recordings, setRecordings }: HomeProps) {
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
         <TextInput style={styles.searchInput} placeholder="Search recordings" />
-        <TouchableOpacity style={styles.circleButton}>
+        <TouchableOpacity style={styles.circleButtonRight}>
           <FontAwesome name="upload" size={25} color="#182F59" />
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.circleButton}
+          style={styles.circleButtonRight}
           onPress={() => navigateTo('Settings')}
         >
           <FontAwesome name="gear" size={25} color="#182F59" />
@@ -366,28 +386,41 @@ function Recording({
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text>Recording</Text>
-      <Text>
-        Name:
-        {selectedRecording.name}
-      </Text>
-      <Text>
-        Path:
-        {selectedRecording.path}
-      </Text>
-      <Text>
-        Date:
-        {selectedRecording.date}
-      </Text>
-      <Text>
-        Duration:
-        {selectedRecording.duration}
-      </Text>
-      <Text>
-        Transcribed Text:
-        {selectedRecording.transcribedText}
-      </Text>
-      <Button title="Back" onPress={() => navigateTo('Home', null)} />
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          style={styles.circleButtonLeft}
+          onPress={() => navigateTo('Home', null)}
+        >
+          <FontAwesome name="arrow-left" size={25} color="#182F59" />
+        </TouchableOpacity>
+        <Text style={styles.recordingName}>{selectedRecording.name}</Text>
+        <TouchableOpacity style={styles.circleButtonRight}>
+          <FontAwesome name="gear" size={25} color="#182F59" />
+        </TouchableOpacity>
+      </View>
+      <ScrollView style={styles.scrollableTextBox}>
+        <Text>Recording</Text>
+        <Text>
+          Name:
+          {selectedRecording.name}
+        </Text>
+        <Text>
+          Path:
+          {selectedRecording.path}
+        </Text>
+        <Text>
+          Date:
+          {selectedRecording.date}
+        </Text>
+        <Text>
+          Duration:
+          {selectedRecording.duration}
+        </Text>
+        <Text>
+          Transcribed Text:
+          {selectedRecording.transcribedText}
+        </Text>
+      </ScrollView>
     </SafeAreaView>
   )
 }
