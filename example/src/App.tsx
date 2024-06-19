@@ -164,6 +164,27 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     borderWidth: 1,
     width: '100%',
+    marginBottom: 10,
+  },
+  miniPlayer: {
+    padding: 15,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderColor: '#ddd',
+    borderWidth: 1,
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  playerButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#182F59',
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: 10,
   },
 })
 
@@ -375,14 +396,16 @@ function Recording({
   recordings,
   selectedRecordingIndex,
 }: RecordingProps) {
+  const isPlayingRef = useRef(false)
   if (selectedRecordingIndex === null) {
     return null
   }
   const selectedRecording = recordings[selectedRecordingIndex]
-
   if (!selectedRecording) {
     return null // or return some default JSX
   }
+
+  // State for managing play/pause
 
   return (
     <SafeAreaView style={styles.container}>
@@ -421,6 +444,25 @@ function Recording({
           {selectedRecording.transcribedText}
         </Text>
       </ScrollView>
+      <View style={styles.miniPlayer}>
+        <TouchableOpacity
+          style={styles.playerButton}
+          onPress={() => {
+            if (isPlayingRef.current) {
+              audioRecorderPlayer.pausePlayer()
+            } else {
+              audioRecorderPlayer.startPlayer(selectedRecording.path)
+            }
+            isPlayingRef.current = !isPlayingRef.current
+          }}
+        >
+          <FontAwesome
+            name={isPlayingRef.current ? 'pause' : 'play'}
+            size={25}
+            color="#FFF"
+          />
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   )
 }
