@@ -1,5 +1,11 @@
 import FontAwesome from 'react-native-vector-icons/FontAwesome'
-import React, { useCallback, useState, useRef, SetStateAction } from 'react'
+import React, {
+  useCallback,
+  useState,
+  useRef,
+  SetStateAction,
+  useEffect,
+} from 'react'
 import {
   Button,
   StyleSheet,
@@ -14,15 +20,13 @@ import {
 } from 'react-native'
 import RNFS from 'react-native-fs'
 import AudioRecorderPlayer from 'react-native-audio-recorder-player'
-
-const audioRecorderPlayer = new AudioRecorderPlayer()
-
 // import { unzip } from 'react-native-zip-archive'
 // import Sound from 'react-native-sound'
-// import { initWhisper, libVersion, AudioSessionIos } from '../../src' // whisper.rn
-// import type { WhisperContext } from '../../src'
-// import contextOpts from './context-opts'
-// const sampleFile = require('../assets/jfk.wav')
+import { initWhisper } from '../../src' // whisper.rn
+import type { WhisperContext } from '../../src'
+import contextOpts from './context-opts'
+
+const audioRecorderPlayer = new AudioRecorderPlayer()
 
 if (Platform.OS === 'android') {
   // Request record audio permission
@@ -188,46 +192,28 @@ const styles = StyleSheet.create({
   },
 })
 
-// function toTimestamp(t: number, comma = false) {
-//   let msec = t * 10
-//   const hr = Math.floor(msec / (1000 * 60 * 60))
-//   msec -= hr * (1000 * 60 * 60)
-//   const min = Math.floor(msec / (1000 * 60))
-//   msec -= min * (1000 * 60)
-//   const sec = Math.floor(msec / 1000)
-//   msec -= sec * 1000
+function toTimestamp(t: number, comma = false) {
+  let msec = t * 10
+  const hr = Math.floor(msec / (1000 * 60 * 60))
+  msec -= hr * (1000 * 60 * 60)
+  const min = Math.floor(msec / (1000 * 60))
+  msec -= min * (1000 * 60)
+  const sec = Math.floor(msec / 1000)
+  msec -= sec * 1000
 
-//   const separator = comma ? ',' : '.'
-//   const timestamp = `${String(hr).padStart(2, '0')}:${String(min).padStart(
-//     2,
-//     '0',
-//   )}:${String(sec).padStart(2, '0')}${separator}${String(msec).padStart(
-//     3,
-//     '0',
-//   )}`
+  const separator = comma ? ',' : '.'
+  const timestamp = `${String(hr).padStart(2, '0')}:${String(min).padStart(
+    2,
+    '0',
+  )}:${String(sec).padStart(2, '0')}${separator}${String(msec).padStart(
+    3,
+    '0',
+  )}`
 
-//   return timestamp
-// }
+  return timestamp
+}
 
-// const mode = process.env.NODE_ENV === 'development' ? 'debug' : 'release'
-
-const fileDir = `${RNFS.DocumentDirectoryPath}/whisper`
-
-console.log('[App] fileDir', fileDir)
-
-// const recordFile = `${fileDir}/realtime.wav`
-
-// const modelHost = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main'
-
-// const createDir = async (log: any) => {
-//   if (!(await RNFS.exists(fileDir))) {
-//     log('Create dir', fileDir)
-//     await RNFS.mkdir(fileDir)
-//   }
-// }
-
-// const filterPath = (path: string) =>
-//   path.replace(RNFS.DocumentDirectoryPath, '<DocumentDir>')
+const mode = process.env.NODE_ENV === 'development' ? 'debug' : 'release'
 
 interface HomeProps {
   navigateTo: (screenName: string, index?: number | null) => void
@@ -236,33 +222,6 @@ interface HomeProps {
 }
 
 function Home({ navigateTo, recordings, setRecordings }: HomeProps) {
-  // const [whisperContext, setWhisperContext] = useState<WhisperContext | null>(
-  //   null,
-  // )
-  // const [logs, setLogs] = useState([`whisper.cpp version: ${libVersion}`])
-  // const [transcibeResult, setTranscibeResult] = useState<string | null>(null)
-  // const [stopTranscribe, setStopTranscribe] = useState<{
-  //   stop: () => void
-  // } | null>(null)
-  // const [recordedFilePath, setRecordedFilePath] = useState<string | null>(null)
-
-  // const log = useCallback((...messages: any[]) => {
-  //   setLogs((prev) => [...prev, messages.join(' ')])
-  // }, [])
-
-  // const progress = useCallback(
-  //   ({
-  //     contentLength,
-  //     bytesWritten,
-  //   }: {
-  //     contentLength: number
-  //     bytesWritten: number
-  //   }) => {
-  //     const written = bytesWritten >= 0 ? bytesWritten : 0
-  //     log(`Download progress: ${Math.round((written / contentLength) * 100)}%`)
-  //   },
-  //   [log],
-  // )
   const [isRecording, setIsRecording] = useState(false)
   const recordingDuration = useRef(0)
   const timer = useRef<NodeJS.Timeout | null>(null)
@@ -396,6 +355,59 @@ function Recording({
   recordings,
   selectedRecordingIndex,
 }: RecordingProps) {
+  const [whisperContext, setWhisperContext] = useState<WhisperContext | null>(
+    null,
+  )
+  const [stopTranscribe, setStopTranscribe] = useState<{
+    stop: () => void
+  } | null>(null)
+  useEffect(() => {
+    const initializeAsset = async () => {
+      // Your initialization logic here
+      // For example, initializing whisperContext as shown in your previous code snippet
+      if (whisperContext) {
+        console.log('Found previous context')
+        await whisperContext.release()
+        setWhisperContext(null)
+        console.log('Released previous context')
+      }
+      console.log('Initialize context...')
+      const startTime = Date.now()
+      const ctx = await initWhisper({
+        filePath: require('../assets/ggml-tiny.bin'),
+        ...contextOpts,
+      })
+      const endTime = Date.now()
+      console.log('Loaded model, ID:', ctx.id)
+      console.log('Loaded model in', endTime - startTime, `ms in ${mode} mode`)
+      setWhisperContext(ctx)
+    }
+
+    initializeAsset()
+  }, [])
+
+  const [isPlaying, setIsPlaying] = useState(false)
+
+  // const [logs, setLogs] = useState([`whisper.cpp version: ${libVersion}`])
+  // const [transcibeResult, setTranscibeResult] = useState<string | null>(null)
+  // const log = useCallback((...messages: any[]) => {
+  //   setLogs((prev) => [...prev, messages.join(' ')])
+  // }, [])
+
+  // const progress = useCallback(
+  //   ({
+  //     contentLength,
+  //     bytesWritten,
+  //   }: {
+  //     contentLength: number
+  //     bytesWritten: number
+  //   }) => {
+  //     const written = bytesWritten >= 0 ? bytesWritten : 0
+  //     log(`Download progress: ${Math.round((written / contentLength) * 100)}%`)
+  //   },
+  //   [log],
+  // )
+
   if (selectedRecordingIndex === null) {
     return null
   }
@@ -417,6 +429,11 @@ function Recording({
       )
       console.log(result)
     }
+  }
+
+  const onPauseRecord = async () => {
+    const result = await audioRecorderPlayer.pausePlayer()
+    console.log(result)
   }
 
   return (
@@ -455,10 +472,63 @@ function Recording({
           Transcribed Text:
           {selectedRecording.transcribedText}
         </Text>
+        <TouchableOpacity
+          style={styles.button}
+          disabled={!!stopTranscribe?.stop}
+          onPress={async () => {
+            if (!whisperContext) return console.log('No context')
+
+            console.log('Start transcribing...')
+            const startTime = Date.now()
+            const { stop, promise } = whisperContext.transcribe(
+              selectedRecording.path,
+              {
+                maxLen: 1,
+                tokenTimestamps: true,
+                onProgress: (cur) => {
+                  console.log(`Transcribing progress: ${cur}%`)
+                },
+                language: 'en',
+              },
+            )
+            setStopTranscribe({ stop })
+            const { result, segments } = await promise
+            const endTime = Date.now()
+            setStopTranscribe(null)
+            console.log(
+              `Transcribed result: ${result}\n` +
+                `Transcribed in ${endTime - startTime}ms in ${mode} mode` +
+                `\n` +
+                `Segments:` +
+                `\n${segments
+                  .map(
+                    (segment) =>
+                      `[${toTimestamp(segment.t0)} --> ${toTimestamp(
+                        segment.t1,
+                      )}]  ${segment.text}`,
+                  )
+                  .join('\n')}`,
+            )
+            console.log('Finished transcribing')
+          }}
+        >
+          <Text style={styles.buttonText}>Transcribe File</Text>
+        </TouchableOpacity>
       </ScrollView>
       <View style={styles.miniPlayer}>
-        <TouchableOpacity style={styles.playerButton} onPress={onPlayRecord}>
-          <FontAwesome name="play" size={25} color="#FFF" />
+        {/* Use state to toggle between play and pause */}
+        <TouchableOpacity
+          style={styles.playerButton}
+          onPress={() => {
+            setIsPlaying(!isPlaying)
+            isPlaying ? onPauseRecord() : onPlayRecord()
+          }}
+        >
+          <FontAwesome
+            name={isPlaying ? 'pause' : 'play'}
+            size={25}
+            color="#FFF"
+          />
         </TouchableOpacity>
       </View>
     </SafeAreaView>
