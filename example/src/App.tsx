@@ -273,7 +273,7 @@ function Home({ navigateTo, recordings, setRecordings }: HomeProps) {
     if (!isDirExist) {
       await RNFS.mkdir(dirPath)
     }
-    const fileName = `recording${recordings.length + 1}.mp3`
+    const fileName = `recording${recordings.length}.mp3`
     const path = `${dirPath}/${fileName}`
 
     const result = await audioRecorderPlayer.startRecorder(path)
@@ -301,7 +301,7 @@ function Home({ navigateTo, recordings, setRecordings }: HomeProps) {
     }
 
     const newRecording: Recording = {
-      name: `Recording ${recordings.length + 1}`,
+      name: `Recording ${recordings.length}`,
       path,
       date: new Date().toLocaleDateString(),
       duration: recordingDuration.current.toString(),
@@ -396,7 +396,6 @@ function Recording({
   recordings,
   selectedRecordingIndex,
 }: RecordingProps) {
-  const isPlayingRef = useRef(false)
   if (selectedRecordingIndex === null) {
     return null
   }
@@ -405,7 +404,20 @@ function Recording({
     return null // or return some default JSX
   }
 
-  // State for managing play/pause
+  const onPlayRecord = async () => {
+    if (selectedRecording.path) {
+      const fileExists = await RNFS.exists(selectedRecording.path)
+      if (!fileExists) {
+        console.log(`File does not exist at path: ${selectedRecording.path}`)
+        return
+      }
+
+      const result = await audioRecorderPlayer.startPlayer(
+        selectedRecording.path,
+      )
+      console.log(result)
+    }
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -445,22 +457,8 @@ function Recording({
         </Text>
       </ScrollView>
       <View style={styles.miniPlayer}>
-        <TouchableOpacity
-          style={styles.playerButton}
-          onPress={() => {
-            if (isPlayingRef.current) {
-              audioRecorderPlayer.pausePlayer()
-            } else {
-              audioRecorderPlayer.startPlayer(selectedRecording.path)
-            }
-            isPlayingRef.current = !isPlayingRef.current
-          }}
-        >
-          <FontAwesome
-            name={isPlayingRef.current ? 'pause' : 'play'}
-            size={25}
-            color="#FFF"
-          />
+        <TouchableOpacity style={styles.playerButton} onPress={onPlayRecord}>
+          <FontAwesome name="play" size={25} color="#FFF" />
         </TouchableOpacity>
       </View>
     </SafeAreaView>
