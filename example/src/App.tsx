@@ -56,6 +56,28 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     padding: 10,
   },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 10,
+  },
+  bottomBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 60,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+    borderColor: '#ddd',
+    borderWidth: 1,
+  },
   buttons: { flexDirection: 'row' },
   button: {
     margin: 4,
@@ -71,16 +93,6 @@ const styles = StyleSheet.create({
     width: '95%',
     borderRadius: 8,
     marginVertical: 8,
-  },
-  logText: { fontSize: 12, color: '#333' },
-
-  // My styles
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginBottom: 10,
   },
   searchInput: {
     flex: 1,
@@ -114,21 +126,7 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     borderWidth: 1,
   },
-  bottomBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 60,
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 40,
-    borderColor: '#ddd',
-    borderWidth: 1,
-  },
+
   micButton: {
     width: 60,
     height: 60,
@@ -306,12 +304,8 @@ function Home({ navigateTo, recordings, setRecordings }: HomeProps) {
         </TouchableOpacity>
       </View>
       <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{
-          ...styles.scrollview,
-          justifyContent: 'flex-start',
-        }}
         style={styles.recordingsList}
+        contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
       >
         {recordings.map((recording, index) => (
@@ -335,10 +329,7 @@ function Home({ navigateTo, recordings, setRecordings }: HomeProps) {
         ))}
       </ScrollView>
       <View style={styles.bottomBar}>
-        <TouchableOpacity
-          style={[styles.micButton, { zIndex: 1 }]}
-          onPress={handleMicPress}
-        >
+        <TouchableOpacity style={styles.micButton} onPress={handleMicPress}>
           <FontAwesome
             name={isRecording ? 'stop' : 'microphone'}
             size={25}
@@ -543,10 +534,7 @@ export default function App() {
   }
 
   return (
-    <ScrollView
-      contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={styles.scrollview}
-    >
+    <View style={{ flex: 1 }}>
       {currentScreen === 'Home' && (
         <Home
           navigateTo={navigateTo}
@@ -564,6 +552,6 @@ export default function App() {
           whisperContext={whisperContext} // Pass whisperContext as a prop
         />
       )}
-    </ScrollView>
+    </View>
   )
 }
