@@ -178,6 +178,33 @@ public class RNWhisper implements LifecycleEventListener {
     tasks.put(task, "transcribeFile-" + id);
   }
 
+  public void convertAudioFile(String sourcePath, String outputPath, Promise promise) {
+    AsyncTask task = new AsyncTask<Void, Void, Double>() {
+      private Exception exception;
+
+      @Override
+      protected Double doInBackground(Void... voids) {
+        try {
+          return AudioFileConverter.convert(sourcePath, outputPath);
+        } catch (Exception error) {
+          exception = error;
+          return null;
+        }
+      }
+
+      @Override
+      protected void onPostExecute(Double duration) {
+        if (exception != null) {
+          promise.reject("audio_conversion_error", exception.getMessage(), exception);
+          return;
+        }
+        promise.resolve(duration);
+        tasks.remove(this);
+      }
+    }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+    tasks.put(task, "convertAudioFile");
+  }
+
   public void startRealtimeTranscribe(double id, double jobId, ReadableMap options, Promise promise) {
     final WhisperContext context = contexts.get((int) id);
     if (context == null) {

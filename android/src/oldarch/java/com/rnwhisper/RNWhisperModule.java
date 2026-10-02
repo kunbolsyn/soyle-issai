@@ -48,6 +48,11 @@ public class RNWhisperModule extends ReactContextBaseJavaModule {
   }
 
   @ReactMethod
+  public void convertAudioFile(String sourcePath, String outputPath, Promise promise) {
+    rnwhisper.convertAudioFile(sourcePath, outputPath, promise);
+  }
+
+  @ReactMethod
   public void startRealtimeTranscribe(double id, double jobId, ReadableMap options, Promise promise) {
     rnwhisper.startRealtimeTranscribe(id, jobId, options, promise);
   }

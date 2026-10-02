@@ -2,14 +2,14 @@ import {
   NativeEventEmitter,
   DeviceEventEmitter,
   Platform,
-  DeviceEventEmitterStatic,
   Image,
 } from 'react-native'
-import RNWhisper, { NativeWhisperContext } from './NativeRNWhisper'
-import type {
-  TranscribeOptions,
-  TranscribeResult,
-  CoreMLAsset,
+import type { DeviceEventEmitterStatic } from 'react-native'
+import RNWhisper, {
+  type NativeWhisperContext,
+  type TranscribeOptions,
+  type TranscribeResult,
+  type CoreMLAsset,
 } from './NativeRNWhisper'
 import AudioSessionIos from './AudioSessionIos'
 import type {
@@ -34,6 +34,13 @@ export type {
   AudioSessionCategoryIos,
   AudioSessionCategoryOptionIos,
   AudioSessionModeIos,
+}
+
+export function convertAudioFile(sourceUri: string, outputPath: string) {
+  const sourcePath = sourceUri.startsWith('file://')
+    ? decodeURIComponent(sourceUri.slice('file://'.length))
+    : sourceUri
+  return RNWhisper.convertAudioFile(sourcePath, outputPath)
 }
 
 const EVENT_ON_TRANSCRIBE_PROGRESS = '@RNWhisper_onTranscribeProgress'
@@ -175,10 +182,7 @@ export type TranscribeRealtimeNativeEvent = {
 }
 
 const updateAudioSession = async (setting: AudioSessionSettingIos) => {
-  await AudioSessionIos.setCategory(
-    setting.category,
-    setting.options || [],
-  )
+  await AudioSessionIos.setCategory(setting.category, setting.options || [])
   if (setting.mode) {
     await AudioSessionIos.setMode(setting.mode)
   }
@@ -192,11 +196,7 @@ export class WhisperContext {
 
   reasonNoGPU: string = ''
 
-  constructor({
-    contextId,
-    gpu,
-    reasonNoGPU,
-  }: NativeWhisperContext) {
+  constructor({ contextId, gpu, reasonNoGPU }: NativeWhisperContext) {
     this.id = contextId
     this.gpu = gpu
     this.reasonNoGPU = reasonNoGPU
@@ -328,7 +328,7 @@ export class WhisperContext {
               t0: segment.t0 + tOffset,
               t1: segment.t1 + tOffset,
             })) || [],
-        }
+        },
       }
     }
 
@@ -371,7 +371,10 @@ export class WhisperContext {
       // iOS: Update audio session state
       await updateAudioSession(options?.audioSessionOnStartIos)
     }
-    if (Platform.OS === 'ios' && typeof options?.audioSessionOnStopIos === 'object') {
+    if (
+      Platform.OS === 'ios' &&
+      typeof options?.audioSessionOnStopIos === 'object'
+    ) {
       prevAudioSession = options?.audioSessionOnStopIos
     }
 
