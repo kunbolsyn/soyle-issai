@@ -20,7 +20,7 @@ import RNFS from 'react-native-fs'
 import AudioRecorderPlayer from 'react-native-audio-recorder-player'
 import type { WhisperContext } from '../../../src'
 import { toTimestamp, transcriptionMode } from '../audioUtils'
-import styles from '../styles'
+import { getStyles, getThemeColors } from '../styles'
 import type { AppScreen, Recording } from '../types'
 
 const audioRecorderPlayer = new AudioRecorderPlayer()
@@ -29,6 +29,7 @@ interface PlaybackSeekBarProps {
   position: number
   duration: number
   onSeek: (progress: number) => void
+  isDark: boolean
 }
 
 function formatPlaybackTime(milliseconds: number) {
@@ -38,7 +39,13 @@ function formatPlaybackTime(milliseconds: number) {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
-function PlaybackSeekBar({ position, duration, onSeek }: PlaybackSeekBarProps) {
+function PlaybackSeekBar({
+  position,
+  duration,
+  onSeek,
+  isDark,
+}: PlaybackSeekBarProps) {
+  const styles = getStyles(isDark)
   const trackWidth = useRef(1)
   const onSeekRef = useRef(onSeek)
   onSeekRef.current = onSeek
@@ -107,6 +114,7 @@ interface RecordingScreenProps {
   setRecordings: React.Dispatch<SetStateAction<Recording[]>>
   selectedRecordingIndex: number | null
   whisperContext: WhisperContext | null
+  isDark: boolean
 }
 
 export default function RecordingScreen({
@@ -115,7 +123,10 @@ export default function RecordingScreen({
   setRecordings,
   selectedRecordingIndex,
   whisperContext,
+  isDark,
 }: RecordingScreenProps) {
+  const styles = getStyles(isDark)
+  const colors = getThemeColors(isDark)
   const [stopTranscribe, setStopTranscribe] = useState<{
     stop: () => void
   } | null>(null)
@@ -129,6 +140,7 @@ export default function RecordingScreen({
   const [recordingNameDraft, setRecordingNameDraft] = useState('')
   const pendingSeekPosition = useRef<number | null>(null)
   const recordingMenuOpacity = useRef(new Animated.Value(0)).current
+  const recordingMenuOffset = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
     audioRecorderPlayer.addPlayBackListener(({ currentPosition, duration }) => {
@@ -151,25 +163,40 @@ export default function RecordingScreen({
     if (isRecordingMenuVisible) {
       setIsRecordingMenuMounted(true)
       recordingMenuOpacity.setValue(0)
-      const animation = Animated.timing(recordingMenuOpacity, {
-        toValue: 1,
-        duration: 160,
-        useNativeDriver: true,
-      })
+      recordingMenuOffset.setValue(-4)
+      const animation = Animated.parallel([
+        Animated.timing(recordingMenuOpacity, {
+          toValue: 1,
+          duration: 160,
+          useNativeDriver: true,
+        }),
+        Animated.timing(recordingMenuOffset, {
+          toValue: 0,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+      ])
       animation.start()
       return () => animation.stop()
     }
 
-    const animation = Animated.timing(recordingMenuOpacity, {
-      toValue: 0,
-      duration: 120,
-      useNativeDriver: true,
-    })
+    const animation = Animated.parallel([
+      Animated.timing(recordingMenuOpacity, {
+        toValue: 0,
+        duration: 120,
+        useNativeDriver: true,
+      }),
+      Animated.timing(recordingMenuOffset, {
+        toValue: -4,
+        duration: 140,
+        useNativeDriver: true,
+      }),
+    ])
     animation.start(({ finished }) => {
       if (finished) setIsRecordingMenuMounted(false)
     })
     return () => animation.stop()
-  }, [isRecordingMenuVisible, recordingMenuOpacity])
+  }, [isRecordingMenuVisible, recordingMenuOffset, recordingMenuOpacity])
 
   if (selectedRecordingIndex === null) return null
   const selectedRecording = recordings[selectedRecordingIndex]
@@ -346,7 +373,7 @@ export default function RecordingScreen({
           style={styles.circleButtonLeft}
           onPress={() => navigateTo('Home', null)}
         >
-          <Feather name="arrow-left" size={19} color="#173C43" />
+          <Feather name="arrow-left" size={21} color={colors.primary} />
         </TouchableOpacity>
         <Text style={styles.recordingDetailTitle} numberOfLines={1}>
           {selectedRecording.name}
@@ -360,9 +387,9 @@ export default function RecordingScreen({
             onPress={() => void startTranscription()}
           >
             {stopTranscribe ? (
-              <ActivityIndicator color="#173C43" />
+              <ActivityIndicator color={colors.primary} />
             ) : (
-              <Feather name="file-text" size={18} color="#173C43" />
+              <Feather name="file-text" size={20} color={colors.primary} />
             )}
           </TouchableOpacity>
           <TouchableOpacity
@@ -371,13 +398,16 @@ export default function RecordingScreen({
             style={styles.circleButtonRight}
             onPress={() => setIsRecordingMenuVisible((visible) => !visible)}
           >
-            <Feather name="more-horizontal" size={19} color="#173C43" />
+            <Feather name="more-horizontal" size={21} color={colors.primary} />
           </TouchableOpacity>
           {isRecordingMenuMounted && (
             <Animated.View
               style={[
                 styles.recordingContextMenu,
-                { opacity: recordingMenuOpacity },
+                {
+                  opacity: recordingMenuOpacity,
+                  transform: [{ translateY: recordingMenuOffset }],
+                },
               ]}
             >
               <Pressable
@@ -386,7 +416,7 @@ export default function RecordingScreen({
                 style={styles.contextMenuItem}
                 onPress={openRenameModal}
               >
-                <Feather name="edit-2" size={16} color="#173C43" />
+                <Feather name="edit-2" size={16} color={colors.primary} />
                 <Text style={styles.contextMenuLabel}>Rename</Text>
               </Pressable>
               <View style={styles.contextMenuDivider} />
@@ -396,7 +426,7 @@ export default function RecordingScreen({
                 style={styles.contextMenuItem}
                 onPress={confirmDeleteRecording}
               >
-                <Feather name="trash-2" size={16} color="#B43F45" />
+                <Feather name="trash-2" size={16} color={colors.danger} />
                 <Text style={styles.contextMenuDeleteLabel}>Delete</Text>
               </Pressable>
             </Animated.View>
@@ -426,7 +456,7 @@ export default function RecordingScreen({
         ) : (
           <View style={styles.emptyState}>
             <View style={styles.emptyIcon}>
-              <Feather name="file-text" size={23} color="#32877F" />
+              <Feather name="file-text" size={23} color={colors.accent} />
             </View>
             <Text style={styles.emptyTitle}>No transcript yet</Text>
             <Text style={styles.emptyDescription}>
@@ -442,6 +472,7 @@ export default function RecordingScreen({
             playbackDuration || Number(selectedRecording.duration) * 1000
           }
           onSeek={seekToProgress}
+          isDark={isDark}
         />
         <View style={styles.playbackControls}>
           <TouchableOpacity
@@ -450,7 +481,7 @@ export default function RecordingScreen({
             style={styles.playbackSkipButton}
             onPress={() => seekBySeconds(-5)}
           >
-            <Feather name="rotate-ccw" size={32} color="#173C43" />
+            <Feather name="rotate-ccw" size={32} color={colors.primary} />
             <Text style={styles.playbackSkipLabel}>5</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -464,7 +495,7 @@ export default function RecordingScreen({
             <Feather
               name={isPlaying ? 'pause' : 'play'}
               size={24}
-              color="#FFFFFF"
+              color={colors.inverse}
             />
           </TouchableOpacity>
           <TouchableOpacity
@@ -473,7 +504,7 @@ export default function RecordingScreen({
             style={styles.playbackSkipButton}
             onPress={() => seekBySeconds(5)}
           >
-            <Feather name="rotate-cw" size={32} color="#173C43" />
+            <Feather name="rotate-cw" size={32} color={colors.primary} />
             <Text style={styles.playbackSkipLabel}>5</Text>
           </TouchableOpacity>
         </View>

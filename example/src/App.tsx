@@ -1,5 +1,16 @@
-import React, { useEffect, useState } from 'react'
-import { Alert, View } from 'react-native'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Alert,
+  Animated,
+  BackHandler,
+  Easing,
+  NativeModules,
+  PanResponder,
+  Platform,
+  StatusBar,
+  useColorScheme,
+  useWindowDimensions,
+} from 'react-native'
 import RNFS from 'react-native-fs'
 import DocumentPicker from 'react-native-document-picker'
 import { convertAudioFile, initWhisper } from '../../src'
@@ -9,10 +20,15 @@ import ScreenTransition from './ScreenTransition'
 import HomeScreen from './screens/HomeScreen'
 import RecordingScreen from './screens/RecordingScreen'
 import SettingsScreen from './screens/SettingsScreen'
-import type { AppScreen, Recording } from './types'
+import { getThemeColors } from './styles'
+import type { AppearancePreference, AppScreen, Recording } from './types'
+
+const appearancePreferencePath = `${RNFS.DocumentDirectoryPath}/appearance-preference`
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('Home')
+  const currentScreenRef = useRef(currentScreen)
+  currentScreenRef.current = currentScreen
   const [recordings, setRecordings] = useState<Recording[]>([])
   const [selectedRecordingIndex, setSelectedRecordingIndex] = useState<
     number | null
@@ -21,11 +37,155 @@ export default function App() {
     null,
   )
   const [isImportingAudio, setIsImportingAudio] = useState(false)
+  const [appearance, setAppearance] = useState<AppearancePreference>('system')
+  const [isAppearanceLoaded, setIsAppearanceLoaded] = useState(false)
+  const themeOpacity = useRef(new Animated.Value(1)).current
+  const backSwipeOffset = useRef(new Animated.Value(0)).current
+  const backSwipeStartX = useRef(Number.POSITIVE_INFINITY)
+  const { width: screenWidth } = useWindowDimensions()
+  const systemColorScheme = useColorScheme()
+  const isDark =
+    appearance === 'dark' ||
+    (appearance === 'system' && systemColorScheme === 'dark')
+  const themeColors = getThemeColors(isDark)
+  const changeAppearance = (nextAppearance: AppearancePreference) => {
+    if (nextAppearance === appearance) return
+    themeOpacity.stopAnimation()
+    Animated.timing(themeOpacity, {
+      toValue: 0.92,
+      duration: 90,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (!finished) return
+      setAppearance(nextAppearance)
+      Animated.timing(themeOpacity, {
+        toValue: 1,
+        duration: 180,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start()
+    })
+  }
+
+  useEffect(() => {
+    let isMounted = true
+    const loadAppearance = async () => {
+      try {
+        if (await RNFS.exists(appearancePreferencePath)) {
+          const savedAppearance = await RNFS.readFile(
+            appearancePreferencePath,
+            'utf8',
+          )
+          if (
+            savedAppearance === 'light' ||
+            savedAppearance === 'dark' ||
+            savedAppearance === 'system'
+          ) {
+            setAppearance(savedAppearance)
+          }
+        }
+      } catch (error) {
+        console.warn('Unable to load appearance preference:', error)
+      } finally {
+        if (isMounted) setIsAppearanceLoaded(true)
+      }
+    }
+
+    void loadAppearance()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isAppearanceLoaded) return
+    void RNFS.writeFile(appearancePreferencePath, appearance, 'utf8').catch(
+      (error) => console.warn('Unable to save appearance preference:', error),
+    )
+  }, [appearance, isAppearanceLoaded])
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return
+    NativeModules.SoyleNavigationBar?.setNavigationBarColor(
+      themeColors.background,
+      !isDark,
+    )
+  }, [isDark, themeColors.background])
 
   const navigateTo = (screenName: AppScreen, index: number | null = null) => {
     setCurrentScreen(screenName)
     setSelectedRecordingIndex(index)
   }
+
+  const returnHome = () => {
+    setCurrentScreen('Home')
+    setSelectedRecordingIndex(null)
+  }
+  const returnHomeRef = useRef(returnHome)
+  returnHomeRef.current = returnHome
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        if (currentScreen === 'Home') return false
+        returnHome()
+        return true
+      },
+    )
+    return () => subscription.remove()
+  }, [currentScreen])
+
+  const backSwipeResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponderCapture: (event) => {
+          backSwipeStartX.current = event.nativeEvent.pageX
+          return false
+        },
+        onMoveShouldSetPanResponderCapture: (_, gesture) =>
+          Platform.OS === 'ios' &&
+          currentScreenRef.current !== 'Home' &&
+          backSwipeStartX.current <= 28 &&
+          gesture.dx > 12 &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2,
+        onPanResponderMove: (_, gesture) => {
+          backSwipeOffset.setValue(Math.max(0, gesture.dx))
+        },
+        onPanResponderRelease: (_, gesture) => {
+          if (gesture.dx > screenWidth * 0.25 || gesture.vx > 0.7) {
+            Animated.timing(backSwipeOffset, {
+              toValue: screenWidth,
+              duration: 170,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: true,
+            }).start(({ finished }) => {
+              if (!finished) return
+              backSwipeOffset.setValue(0)
+              returnHomeRef.current()
+            })
+            return
+          }
+
+          Animated.timing(backSwipeOffset, {
+            toValue: 0,
+            duration: 150,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }).start()
+        },
+        onPanResponderTerminate: () => {
+          Animated.timing(backSwipeOffset, {
+            toValue: 0,
+            duration: 150,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }).start()
+        },
+      }),
+    [backSwipeOffset, screenWidth],
+  )
 
   const onImportAudio = async () => {
     setIsImportingAudio(true)
@@ -90,7 +250,20 @@ export default function App() {
   }, [])
 
   return (
-    <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+    <Animated.View
+      style={{
+        flex: 1,
+        backgroundColor: themeColors.background,
+        opacity: themeOpacity,
+        transform: [{ translateX: backSwipeOffset }],
+      }}
+      {...backSwipeResponder.panHandlers}
+    >
+      <StatusBar
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={themeColors.background}
+        translucent={false}
+      />
       {currentScreen === 'Home' && (
         <ScreenTransition key="Home">
           <HomeScreen
@@ -99,12 +272,18 @@ export default function App() {
             setRecordings={setRecordings}
             isImportingAudio={isImportingAudio}
             onImportAudio={() => void onImportAudio()}
+            isDark={isDark}
           />
         </ScreenTransition>
       )}
       {currentScreen === 'Settings' && (
         <ScreenTransition key="Settings">
-          <SettingsScreen navigateTo={navigateTo} />
+          <SettingsScreen
+            navigateTo={navigateTo}
+            appearance={appearance}
+            onAppearanceChange={changeAppearance}
+            isDark={isDark}
+          />
         </ScreenTransition>
       )}
       {currentScreen === 'Recording' && (
@@ -115,9 +294,10 @@ export default function App() {
             setRecordings={setRecordings}
             selectedRecordingIndex={selectedRecordingIndex}
             whisperContext={whisperContext}
+            isDark={isDark}
           />
         </ScreenTransition>
       )}
-    </View>
+    </Animated.View>
   )
 }

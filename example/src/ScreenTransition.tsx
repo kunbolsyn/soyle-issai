@@ -7,20 +7,20 @@ export default function ScreenTransition({
   children: React.ReactNode
 }) {
   const opacity = useRef(new Animated.Value(0)).current
-  const offset = useRef(new Animated.Value(10)).current
+  const offset = useRef(new Animated.Value(6)).current
 
   useEffect(() => {
     Animated.parallel([
       Animated.timing(opacity, {
         toValue: 1,
-        duration: 260,
-        easing: Easing.out(Easing.quad),
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
-      Animated.spring(offset, {
+      Animated.timing(offset, {
         toValue: 0,
-        speed: 18,
-        bounciness: 3,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
     ]).start()

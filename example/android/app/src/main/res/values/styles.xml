@@ -1,9 +1,13 @@
 <resources>
 
     <!-- Base application theme. -->
-    <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+    <style name="AppThemeBase" parent="Theme.AppCompat.Light.NoActionBar">
         <!-- Customize your theme here. -->
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+        <item name="android:windowBackground">#EAF1EE</item>
+        <item name="android:statusBarColor">#EAF1EE</item>
+        <item name="android:navigationBarColor">#EAF1EE</item>
     </style>
+    <style name="AppTheme" parent="@style/AppThemeBase" />
 
 </resources>

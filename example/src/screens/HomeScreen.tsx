@@ -9,7 +9,6 @@ import {
   PermissionsAndroid,
   Platform,
   SafeAreaView,
-  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
@@ -22,7 +21,7 @@ import {
   formatRecordingTimestamp,
   getAudioLevel,
 } from '../audioUtils'
-import styles from '../styles'
+import { getStyles, getThemeColors } from '../styles'
 import type { AppScreen, Recording } from '../types'
 
 interface HomeScreenProps {
@@ -31,6 +30,7 @@ interface HomeScreenProps {
   setRecordings: React.Dispatch<SetStateAction<Recording[]>>
   isImportingAudio: boolean
   onImportAudio: () => void
+  isDark: boolean
 }
 
 export default function HomeScreen({
@@ -39,7 +39,10 @@ export default function HomeScreen({
   setRecordings,
   isImportingAudio,
   onImportAudio,
+  isDark,
 }: HomeScreenProps) {
+  const styles = getStyles(isDark)
+  const colors = getThemeColors(isDark)
   const [isRecording, setIsRecording] = useState(false)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [waveformLevels, setWaveformLevels] = useState<number[]>(
@@ -51,10 +54,12 @@ export default function HomeScreen({
   >(() => new Set())
   const isRecordingRef = useRef(false)
   const pulse = useRef(new Animated.Value(0)).current
+  const listScrollY = useRef(new Animated.Value(0)).current
   const lastWaveformUpdate = useRef(0)
   const recordingDuration = useRef(0)
   const recordingStartedAt = useRef(0)
   const timer = useRef<ReturnType<typeof setInterval> | null>(null)
+  const currentRecordingName = `Recording ${recordings.length + 1}`
 
   useEffect(() => {
     const addDataListener = AudioRecord.on as unknown as (
@@ -158,7 +163,7 @@ export default function HomeScreen({
     }
 
     const newRecording: Recording = {
-      name: `Recording ${recordings.length}`,
+      name: currentRecordingName,
       path,
       recordedAt: recordingStartedAt.current,
       duration: recordingDuration.current.toString(),
@@ -267,17 +272,19 @@ export default function HomeScreen({
     2,
     '0',
   )}:${String(elapsedSeconds % 60).padStart(2, '0')}`
+  const expandedTitleOpacity = listScrollY.interpolate({
+    inputRange: [0, 20, 30],
+    outputRange: [1, 1, 0],
+    extrapolate: 'clamp',
+  })
+  const compactTitleOpacity = listScrollY.interpolate({
+    inputRange: [22, 32, 50],
+    outputRange: [0, 0, 1],
+    extrapolate: 'clamp',
+  })
 
   return (
     <SafeAreaView style={styles.container}>
-      <View pointerEvents="none" style={styles.headerFade}>
-        {Array.from({ length: 12 }, (_, index) => (
-          <View
-            key={index}
-            style={[styles.headerFadeBand, { opacity: 1 - index / 12 }]}
-          />
-        ))}
-      </View>
       <View style={styles.topBar}>
         {selectedRecordingPaths.size > 0 ? (
           <>
@@ -302,7 +309,7 @@ export default function HomeScreen({
                       : 'check-square'
                   }
                   size={18}
-                  color="#173C43"
+                  color={colors.primary}
                 />
               </TouchableOpacity>
               <TouchableOpacity
@@ -311,7 +318,7 @@ export default function HomeScreen({
                 style={styles.iconButton}
                 onPress={confirmDeleteSelectedRecordings}
               >
-                <Feather name="trash-2" size={18} color="#B43F45" />
+                <Feather name="trash-2" size={18} color={colors.danger} />
               </TouchableOpacity>
               <TouchableOpacity
                 accessibilityRole="button"
@@ -319,23 +326,21 @@ export default function HomeScreen({
                 style={styles.iconButton}
                 onPress={() => setSelectedRecordingPaths(new Set())}
               >
-                <Feather name="x" size={18} color="#173C43" />
+                <Feather name="x" size={18} color={colors.primary} />
               </TouchableOpacity>
             </View>
           </>
         ) : (
           <>
-            <View style={styles.homeSearchContainer}>
-              <Feather name="search" size={17} color="#60777A" />
-              <TextInput
-                style={styles.homeSearchInput}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholder="Search recordings"
-                placeholderTextColor="#82989A"
-                returnKeyType="search"
-              />
-            </View>
+            <Animated.Text
+              numberOfLines={1}
+              style={[
+                styles.compactPageTitle,
+                { opacity: compactTitleOpacity },
+              ]}
+            >
+              Recordings
+            </Animated.Text>
             <View style={styles.topActions}>
               <TouchableOpacity
                 accessibilityRole="button"
@@ -345,9 +350,9 @@ export default function HomeScreen({
                 onPress={onImportAudio}
               >
                 {isImportingAudio ? (
-                  <ActivityIndicator color="#173C43" />
+                  <ActivityIndicator color={colors.primary} />
                 ) : (
-                  <Feather name="upload" size={18} color="#173C43" />
+                  <Feather name="upload" size={20} color={colors.primary} />
                 )}
               </TouchableOpacity>
               <TouchableOpacity
@@ -357,38 +362,65 @@ export default function HomeScreen({
                 style={styles.iconButton}
                 onPress={() => navigateTo('Settings', null)}
               >
-                <Feather name="settings" size={19} color="#173C43" />
+                <Feather name="settings" size={21} color={colors.primary} />
               </TouchableOpacity>
             </View>
           </>
         )}
       </View>
-      <ScrollView
+      <Animated.ScrollView
         style={styles.recordingsList}
         contentContainerStyle={{ flexGrow: 1, paddingBottom: 10 }}
         showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: listScrollY } } }],
+          { useNativeDriver: true },
+        )}
+        scrollEventThrottle={16}
       >
-        <View style={styles.sectionHeading}>
-          <Text style={styles.pageTitle}>Recordings</Text>
-          <Text style={styles.recordingsCount}>
-            {`${recordings.length} ${recordings.length === 1 ? 'recording' : 'recordings'}`}
-          </Text>
-        </View>
+        {selectedRecordingPaths.size === 0 && (
+          <>
+            <Animated.Text
+              numberOfLines={1}
+              style={[
+                styles.pageTitle,
+                {
+                  opacity: expandedTitleOpacity,
+                },
+              ]}
+            >
+              Recordings
+            </Animated.Text>
+            <View style={styles.homeSearchContainer}>
+              <Feather name="search" size={17} color={colors.muted} />
+              <TextInput
+                style={styles.homeSearchInput}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search recordings"
+                placeholderTextColor={colors.placeholder}
+                returnKeyType="search"
+              />
+            </View>
+          </>
+        )}
         {filteredRecordings.length === 0 ? (
           <View style={styles.emptyState}>
-            <View style={styles.emptyIcon}>
-              <Feather name="mic" size={24} color="#32877F" />
+            <View style={styles.emptyStateCard}>
+              <View style={styles.emptyIcon}>
+                <Feather name="mic" size={24} color={colors.accent} />
+              </View>
+              <Text style={styles.emptyTitle}>
+                {searchQuery
+                  ? 'No matching recordings'
+                  : 'A little quiet in here'}
+              </Text>
+              <Text style={styles.emptyDescription}>
+                {searchQuery
+                  ? 'Try another title or clear your search.'
+                  : 'Your recordings will appear here when you capture or import audio.'}
+              </Text>
             </View>
-            <Text style={styles.emptyTitle}>
-              {searchQuery
-                ? 'No matching recordings'
-                : 'A little quiet in here'}
-            </Text>
-            <Text style={styles.emptyDescription}>
-              {searchQuery
-                ? 'Try another title or clear your search.'
-                : 'Your recordings will appear here when you capture or import audio.'}
-            </Text>
           </View>
         ) : (
           filteredRecordings.map((recording) => {
@@ -414,18 +446,28 @@ export default function HomeScreen({
                 ]}
               >
                 <View style={styles.recordingHeader}>
-                  <Text style={styles.recordingName}>{recording.name}</Text>
+                  <Text style={styles.recordingName} numberOfLines={1}>
+                    {recording.name}
+                  </Text>
                   {isSelected ? (
-                    <Feather name="check-circle" size={20} color="#173C43" />
+                    <Feather
+                      name="check-circle"
+                      size={20}
+                      color={colors.primary}
+                    />
                   ) : (
-                    <Feather name="chevron-right" size={20} color="#60777A" />
+                    <Feather
+                      name="chevron-right"
+                      size={20}
+                      color={colors.muted}
+                    />
                   )}
                 </View>
                 <View style={styles.recordingFooter}>
                   <Text style={styles.recordingDetails} numberOfLines={1}>
                     {formatRecordingTimestamp(recording.recordedAt)}
                   </Text>
-                  <Text style={styles.recordingDuration}>
+                  <Text style={styles.recordingDuration} numberOfLines={1}>
                     {formatRecordingDuration(recording.duration)}
                   </Text>
                 </View>
@@ -433,30 +475,28 @@ export default function HomeScreen({
             )
           })
         )}
-      </ScrollView>
+      </Animated.ScrollView>
       <View
         pointerEvents="box-none"
         style={[styles.floatingDock, isRecording && styles.recordingPanel]}
       >
-        {isRecording && (
-          <View
-            accessibilityLabel="Live audio waveform"
-            pointerEvents="none"
-            style={styles.waveform}
-          >
-            {waveformLevels.map((level, index) => (
-              <View
-                key={index}
-                style={[styles.waveformBar, { height: 3 + level * 56 }]}
-              />
-            ))}
-          </View>
-        )}
         <View pointerEvents="box-none" style={styles.dockContent}>
           {isRecording && (
             <>
-              <Text style={styles.dockLabel}>Recording in progress</Text>
+              <Text style={styles.dockLabel}>{currentRecordingName}</Text>
               <Text style={styles.dockSubtitle}>{elapsedTime}</Text>
+              <View
+                accessibilityLabel="Live audio waveform"
+                pointerEvents="none"
+                style={styles.waveform}
+              >
+                {waveformLevels.map((level, index) => (
+                  <View
+                    key={index}
+                    style={[styles.waveformBar, { height: 3 + level * 56 }]}
+                  />
+                ))}
+              </View>
             </>
           )}
           <View pointerEvents="box-none" style={styles.micControl}>
@@ -499,7 +539,7 @@ export default function HomeScreen({
               <Feather
                 name={isRecording ? 'square' : 'mic'}
                 size={24}
-                color="#FFFFFF"
+                color={colors.inverse}
               />
             </TouchableOpacity>
           </View>
