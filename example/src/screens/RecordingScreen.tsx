@@ -5,6 +5,9 @@ import {
   Alert,
   ActivityIndicator,
   Animated,
+  Easing,
+  Image,
+  KeyboardAvoidingView,
   Modal,
   PanResponder,
   type GestureResponderEvent,
@@ -20,8 +23,9 @@ import RNFS from 'react-native-fs'
 import AudioRecorderPlayer from 'react-native-audio-recorder-player'
 import type { WhisperContext } from '../../../src'
 import { toTimestamp, transcriptionMode } from '../audioUtils'
+import { translate } from '../i18n'
 import { getStyles, getThemeColors } from '../styles'
-import type { AppScreen, Recording } from '../types'
+import type { AppLanguage, AppScreen, Recording } from '../types'
 
 const audioRecorderPlayer = new AudioRecorderPlayer()
 
@@ -30,6 +34,7 @@ interface PlaybackSeekBarProps {
   duration: number
   onSeek: (progress: number) => void
   isDark: boolean
+  language: AppLanguage
 }
 
 function formatPlaybackTime(milliseconds: number) {
@@ -44,6 +49,7 @@ function PlaybackSeekBar({
   duration,
   onSeek,
   isDark,
+  language,
 }: PlaybackSeekBarProps) {
   const styles = getStyles(isDark)
   const trackWidth = useRef(1)
@@ -69,7 +75,7 @@ function PlaybackSeekBar({
     <>
       <View
         accessibilityRole="adjustable"
-        accessibilityLabel="Playback position"
+        accessibilityLabel={translate(language, 'playbackPosition')}
         accessibilityValue={{ min: 0, max: duration, now: position }}
         accessibilityActions={[{ name: 'decrement' }, { name: 'increment' }]}
         onAccessibilityAction={(event) =>
@@ -115,6 +121,7 @@ interface RecordingScreenProps {
   selectedRecordingIndex: number | null
   whisperContext: WhisperContext | null
   isDark: boolean
+  language: AppLanguage
 }
 
 export default function RecordingScreen({
@@ -124,9 +131,12 @@ export default function RecordingScreen({
   selectedRecordingIndex,
   whisperContext,
   isDark,
+  language,
 }: RecordingScreenProps) {
   const styles = getStyles(isDark)
   const colors = getThemeColors(isDark)
+  const t = (key: Parameters<typeof translate>[1]) =>
+    translate(language, key)
   const [stopTranscribe, setStopTranscribe] = useState<{
     stop: () => void
   } | null>(null)
@@ -138,9 +148,49 @@ export default function RecordingScreen({
   const [isRecordingMenuVisible, setIsRecordingMenuVisible] = useState(false)
   const [isRecordingMenuMounted, setIsRecordingMenuMounted] = useState(false)
   const [recordingNameDraft, setRecordingNameDraft] = useState('')
+  const recordingNameInput = useRef<TextInput>(null)
   const pendingSeekPosition = useRef<number | null>(null)
   const recordingMenuOpacity = useRef(new Animated.Value(0)).current
   const recordingMenuOffset = useRef(new Animated.Value(0)).current
+  const renameModalOpacity = useRef(new Animated.Value(0)).current
+  const renameModalScale = useRef(new Animated.Value(0.96)).current
+
+  const animateRenameModalIn = () => {
+    recordingNameInput.current?.focus()
+    Animated.parallel([
+      Animated.timing(renameModalOpacity, {
+        toValue: 1,
+        duration: 190,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.spring(renameModalScale, {
+        toValue: 1,
+        speed: 20,
+        bounciness: 3,
+        useNativeDriver: true,
+      }),
+    ]).start()
+  }
+
+  const closeRenameModal = () => {
+    Animated.parallel([
+      Animated.timing(renameModalOpacity, {
+        toValue: 0,
+        duration: 130,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(renameModalScale, {
+        toValue: 0.97,
+        duration: 130,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (finished) setIsRenameModalVisible(false)
+    })
+  }
 
   useEffect(() => {
     audioRecorderPlayer.addPlayBackListener(({ currentPosition, duration }) => {
@@ -290,8 +340,10 @@ export default function RecordingScreen({
       console.log('Finished transcribing')
     } catch (error) {
       Alert.alert(
-        'Transcription failed',
-        error instanceof Error ? error.message : 'Unable to transcribe audio.',
+        t('transcriptionFailed'),
+        error instanceof Error
+          ? error.message
+          : t('unableToTranscribeAudio'),
       )
     } finally {
       setStopTranscribe(null)
@@ -306,7 +358,7 @@ export default function RecordingScreen({
         index === selectedRecordingIndex ? { ...recording, name } : recording,
       ),
     )
-    setIsRenameModalVisible(false)
+    closeRenameModal()
   }
 
   const deleteSelectedRecording = async () => {
@@ -323,8 +375,8 @@ export default function RecordingScreen({
       navigateTo('Home', null)
     } catch (error) {
       Alert.alert(
-        'Unable to delete recording',
-        error instanceof Error ? error.message : 'Please try again.',
+        t('unableToDeleteRecording'),
+        error instanceof Error ? error.message : t('pleaseTryAgain'),
       )
     }
   }
@@ -332,18 +384,20 @@ export default function RecordingScreen({
   const openRenameModal = () => {
     setIsRecordingMenuVisible(false)
     setRecordingNameDraft(selectedRecording.name)
+    renameModalOpacity.setValue(0)
+    renameModalScale.setValue(0.96)
     setIsRenameModalVisible(true)
   }
 
   const confirmDeleteRecording = () => {
     setIsRecordingMenuVisible(false)
     Alert.alert(
-      'Delete recording?',
-      'This will permanently delete the recording.',
+      t('deleteRecordingTitle'),
+      t('deleteRecordingMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('delete'),
           style: 'destructive',
           onPress: () => void deleteSelectedRecording(),
         },
@@ -356,7 +410,7 @@ export default function RecordingScreen({
       {isRecordingMenuVisible && (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Dismiss recording options"
+          accessibilityLabel={t('dismissRecordingOptions')}
           style={styles.contextMenuBackdrop}
           onPress={() => setIsRecordingMenuVisible(false)}
         />
@@ -369,7 +423,7 @@ export default function RecordingScreen({
       >
         <TouchableOpacity
           accessibilityRole="button"
-          accessibilityLabel="Back to recordings"
+          accessibilityLabel={t('backToRecordings')}
           style={styles.circleButtonLeft}
           onPress={() => navigateTo('Home', null)}
         >
@@ -381,7 +435,7 @@ export default function RecordingScreen({
         <View style={styles.topActions}>
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Transcribe recording"
+            accessibilityLabel={t('transcribeRecording')}
             disabled={!whisperContext || !!stopTranscribe}
             style={styles.circleButtonRight}
             onPress={() => void startTranscription()}
@@ -394,7 +448,7 @@ export default function RecordingScreen({
           </TouchableOpacity>
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Recording options"
+            accessibilityLabel={t('recordingOptions')}
             style={styles.circleButtonRight}
             onPress={() => setIsRecordingMenuVisible((visible) => !visible)}
           >
@@ -412,22 +466,22 @@ export default function RecordingScreen({
             >
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Rename recording"
+                accessibilityLabel={t('renameRecordingLabel')}
                 style={styles.contextMenuItem}
                 onPress={openRenameModal}
               >
                 <Feather name="edit-2" size={16} color={colors.primary} />
-                <Text style={styles.contextMenuLabel}>Rename</Text>
+                <Text style={styles.contextMenuLabel}>{t('rename')}</Text>
               </Pressable>
               <View style={styles.contextMenuDivider} />
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Delete recording"
+                accessibilityLabel={t('deleteRecordingLabel')}
                 style={styles.contextMenuItem}
                 onPress={confirmDeleteRecording}
               >
                 <Feather name="trash-2" size={16} color={colors.danger} />
-                <Text style={styles.contextMenuDeleteLabel}>Delete</Text>
+                <Text style={styles.contextMenuDeleteLabel}>{t('delete')}</Text>
               </Pressable>
             </Animated.View>
           )}
@@ -446,7 +500,7 @@ export default function RecordingScreen({
           }}
         >
           <View style={{ flex: 1 }}>
-            <Text style={styles.eyebrow}>TRANSCRIPT</Text>
+            <Text style={styles.eyebrow}>{t('transcript')}</Text>
           </View>
         </View>
         {selectedRecording.transcribedText ? (
@@ -455,13 +509,13 @@ export default function RecordingScreen({
           </Text>
         ) : (
           <View style={styles.emptyState}>
-            <View style={styles.emptyIcon}>
-              <Feather name="file-text" size={23} color={colors.accent} />
-            </View>
-            <Text style={styles.emptyTitle}>No transcript yet</Text>
-            <Text style={styles.emptyDescription}>
-              Transcribe this recording to see the words here.
-            </Text>
+            <Image
+              source={require('../../assets/document.png')}
+              style={styles.emptyIllustration}
+              resizeMode="contain"
+              accessibilityLabel={t('noTranscriptYet')}
+            />
+            <Text style={styles.emptyTitle}>{t('noTranscriptYet')}</Text>
           </View>
         )}
       </ScrollView>
@@ -473,11 +527,12 @@ export default function RecordingScreen({
           }
           onSeek={seekToProgress}
           isDark={isDark}
+          language={language}
         />
         <View style={styles.playbackControls}>
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Back 5 seconds"
+            accessibilityLabel={t('backFiveSeconds')}
             style={styles.playbackSkipButton}
             onPress={() => seekBySeconds(-5)}
           >
@@ -487,7 +542,7 @@ export default function RecordingScreen({
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel={
-              isPlaying ? 'Pause recording' : 'Play recording'
+              isPlaying ? t('pauseRecording') : t('playRecording')
             }
             style={styles.playerButton}
             onPress={() => void (isPlaying ? onPauseRecord() : onPlayRecord())}
@@ -500,7 +555,7 @@ export default function RecordingScreen({
           </TouchableOpacity>
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Forward 5 seconds"
+            accessibilityLabel={t('forwardFiveSeconds')}
             style={styles.playbackSkipButton}
             onPress={() => seekBySeconds(5)}
           >
@@ -512,38 +567,70 @@ export default function RecordingScreen({
       <Modal
         transparent
         visible={isRenameModalVisible}
-        animationType="fade"
-        onRequestClose={() => setIsRenameModalVisible(false)}
+        animationType="none"
+        onShow={animateRenameModalIn}
+        onRequestClose={closeRenameModal}
       >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.renameModal}>
-            <Text style={styles.recordingName}>Rename recording</Text>
-            <TextInput
-              autoFocus
-              style={styles.renameInput}
-              value={recordingNameDraft}
-              onChangeText={setRecordingNameDraft}
-              placeholder="Recording name"
-              selectTextOnFocus
-              returnKeyType="done"
-              onSubmitEditing={renameSelectedRecording}
-            />
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalSecondaryButton}
-                onPress={() => setIsRenameModalVisible(false)}
-              >
-                <Text style={styles.modalSecondaryButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.button}
-                onPress={renameSelectedRecording}
-              >
-                <Text style={styles.buttonText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+        <KeyboardAvoidingView
+          style={styles.modalBackdrop}
+          behavior="padding"
+        >
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.renameModalBackdrop,
+              { opacity: renameModalOpacity },
+            ]}
+          />
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{
+              flexGrow: 1,
+              justifyContent: 'center',
+            }}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Animated.View
+              style={[
+                styles.renameModal,
+                {
+                  opacity: renameModalOpacity,
+                  transform: [{ scale: renameModalScale }],
+                },
+              ]}
+            >
+              <Text style={styles.recordingName}>
+                {t('renameRecordingLabel')}
+              </Text>
+              <TextInput
+                ref={recordingNameInput}
+                style={styles.renameInput}
+                value={recordingNameDraft}
+                onChangeText={setRecordingNameDraft}
+                placeholder={t('recordingName')}
+                selectTextOnFocus
+                returnKeyType="done"
+                onSubmitEditing={renameSelectedRecording}
+              />
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.modalSecondaryButton}
+                  onPress={closeRenameModal}
+                >
+                  <Text style={styles.modalSecondaryButtonText}>
+                    {t('cancel')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.button}
+                  onPress={renameSelectedRecording}
+                >
+                  <Text style={styles.buttonText}>{t('save')}</Text>
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   )

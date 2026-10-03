@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  Image,
   PermissionsAndroid,
   Platform,
   SafeAreaView,
@@ -21,8 +22,9 @@ import {
   formatRecordingTimestamp,
   getAudioLevel,
 } from '../audioUtils'
+import { translate } from '../i18n'
 import { getStyles, getThemeColors } from '../styles'
-import type { AppScreen, Recording } from '../types'
+import type { AppLanguage, AppScreen, Recording } from '../types'
 
 interface HomeScreenProps {
   navigateTo: (screenName: AppScreen, index?: number | null) => void
@@ -31,6 +33,7 @@ interface HomeScreenProps {
   isImportingAudio: boolean
   onImportAudio: () => void
   isDark: boolean
+  language: AppLanguage
 }
 
 export default function HomeScreen({
@@ -40,9 +43,14 @@ export default function HomeScreen({
   isImportingAudio,
   onImportAudio,
   isDark,
+  language,
 }: HomeScreenProps) {
   const styles = getStyles(isDark)
   const colors = getThemeColors(isDark)
+  const t = (
+    key: Parameters<typeof translate>[1],
+    values?: Record<string, string | number>,
+  ) => translate(language, key, values)
   const [isRecording, setIsRecording] = useState(false)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [waveformLevels, setWaveformLevels] = useState<number[]>(
@@ -54,12 +62,13 @@ export default function HomeScreen({
   >(() => new Set())
   const isRecordingRef = useRef(false)
   const pulse = useRef(new Animated.Value(0)).current
+  const recordingOverlayOffset = useRef(new Animated.Value(0)).current
   const listScrollY = useRef(new Animated.Value(0)).current
   const lastWaveformUpdate = useRef(0)
   const recordingDuration = useRef(0)
   const recordingStartedAt = useRef(0)
   const timer = useRef<ReturnType<typeof setInterval> | null>(null)
-  const currentRecordingName = `Recording ${recordings.length + 1}`
+  const currentRecordingName = `${t('recording')} ${recordings.length + 1}`
 
   useEffect(() => {
     const addDataListener = AudioRecord.on as unknown as (
@@ -109,16 +118,33 @@ export default function HomeScreen({
     return () => animation.stop()
   }, [isRecording, pulse])
 
+  useEffect(() => {
+    if (!isRecording) {
+      recordingOverlayOffset.setValue(0)
+      return
+    }
+
+    recordingOverlayOffset.setValue(48)
+    const animation = Animated.timing(recordingOverlayOffset, {
+      toValue: 0,
+      duration: 360,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    })
+    animation.start()
+    return () => animation.stop()
+  }, [isRecording, recordingOverlayOffset])
+
   const onStartRecord = async () => {
     if (Platform.OS === 'android') {
       const permission = await PermissionsAndroid.request(
         'android.permission.RECORD_AUDIO',
         {
-          title: 'Microphone Access',
-          message: 'Microphone access is needed to record speech.',
-          buttonNeutral: 'Ask Me Later',
-          buttonNegative: 'Cancel',
-          buttonPositive: 'OK',
+          title: t('microphoneAccess'),
+          message: t('microphoneAccessMessage'),
+          buttonNeutral: t('askMeLater'),
+          buttonNegative: t('cancel'),
+          buttonPositive: t('ok'),
         },
       )
       if (permission !== PermissionsAndroid.RESULTS.GRANTED) return
@@ -246,8 +272,11 @@ export default function HomeScreen({
     setSelectedRecordingPaths(failedPaths)
     if (failedPaths.size > 0) {
       Alert.alert(
-        'Some recordings could not be deleted',
-        `${failedPaths.size} recording${failedPaths.size === 1 ? '' : 's'} remain selected. Please try again.`,
+        t('someRecordingsCouldNotBeDeleted'),
+        t('recordingsRemainSelected', {
+          count: failedPaths.size,
+          plural: failedPaths.size === 1 ? '' : 's',
+        }),
       )
     }
   }
@@ -255,12 +284,15 @@ export default function HomeScreen({
   const confirmDeleteSelectedRecordings = () => {
     const count = selectedRecordingPaths.size
     Alert.alert(
-      `Delete ${count} recording${count === 1 ? '' : 's'}?`,
-      'This will permanently delete the selected audio files.',
+      t('deleteRecordingsTitle', {
+        count,
+        plural: count === 1 ? '' : 's',
+      }),
+      t('deleteSelectedAudioMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('delete'),
           style: 'destructive',
           onPress: () => void removeSelectedRecordings(),
         },
@@ -289,15 +321,15 @@ export default function HomeScreen({
         {selectedRecordingPaths.size > 0 ? (
           <>
             <Text style={styles.selectionCount}>
-              {`${selectedRecordingPaths.size} selected`}
+              {t('selectedCount', { count: selectedRecordingPaths.size })}
             </Text>
             <View style={styles.selectionActions}>
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityLabel={
                   allVisibleRecordingsSelected
-                    ? 'Deselect all visible recordings'
-                    : 'Select all visible recordings'
+                    ? t('deselectAllVisibleRecordings')
+                    : t('selectAllVisibleRecordings')
                 }
                 style={styles.iconButton}
                 onPress={selectAllVisibleRecordings}
@@ -308,25 +340,27 @@ export default function HomeScreen({
                       ? 'minus-square'
                       : 'check-square'
                   }
-                  size={18}
+                  size={21}
                   color={colors.primary}
                 />
               </TouchableOpacity>
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityLabel={`Delete ${selectedRecordingPaths.size} selected recordings`}
+                accessibilityLabel={t('deleteSelectedRecordingsLabel', {
+                  count: selectedRecordingPaths.size,
+                })}
                 style={styles.iconButton}
                 onPress={confirmDeleteSelectedRecordings}
               >
-                <Feather name="trash-2" size={18} color={colors.danger} />
+                <Feather name="trash-2" size={21} color={colors.danger} />
               </TouchableOpacity>
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityLabel="Cancel selection"
+                accessibilityLabel={t('cancelSelection')}
                 style={styles.iconButton}
                 onPress={() => setSelectedRecordingPaths(new Set())}
               >
-                <Feather name="x" size={18} color={colors.primary} />
+                <Feather name="x" size={21} color={colors.primary} />
               </TouchableOpacity>
             </View>
           </>
@@ -339,12 +373,12 @@ export default function HomeScreen({
                 { opacity: compactTitleOpacity },
               ]}
             >
-              Recordings
+              {t('recordings')}
             </Animated.Text>
             <View style={styles.topActions}>
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityLabel="Import audio"
+                accessibilityLabel={t('importAudio')}
                 disabled={isImportingAudio || isRecording}
                 style={styles.iconButton}
                 onPress={onImportAudio}
@@ -357,7 +391,7 @@ export default function HomeScreen({
               </TouchableOpacity>
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityLabel="Settings"
+                accessibilityLabel={t('settings')}
                 disabled={isRecording}
                 style={styles.iconButton}
                 onPress={() => navigateTo('Settings', null)}
@@ -378,49 +412,41 @@ export default function HomeScreen({
         )}
         scrollEventThrottle={16}
       >
-        {selectedRecordingPaths.size === 0 && (
-          <>
-            <Animated.Text
-              numberOfLines={1}
-              style={[
-                styles.pageTitle,
-                {
-                  opacity: expandedTitleOpacity,
-                },
-              ]}
-            >
-              Recordings
-            </Animated.Text>
-            <View style={styles.homeSearchContainer}>
-              <Feather name="search" size={17} color={colors.muted} />
-              <TextInput
-                style={styles.homeSearchInput}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholder="Search recordings"
-                placeholderTextColor={colors.placeholder}
-                returnKeyType="search"
-              />
-            </View>
-          </>
-        )}
+        <Animated.Text
+          numberOfLines={1}
+          style={[
+            styles.pageTitle,
+            {
+              opacity: expandedTitleOpacity,
+            },
+          ]}
+        >
+          {t('recordings')}
+        </Animated.Text>
+        <View style={styles.homeSearchContainer}>
+          <Feather name="search" size={17} color={colors.muted} />
+          <TextInput
+            style={styles.homeSearchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder={t('searchRecordings')}
+            placeholderTextColor={colors.placeholder}
+            returnKeyType="search"
+          />
+        </View>
         {filteredRecordings.length === 0 ? (
-          <View style={styles.emptyState}>
-            <View style={styles.emptyStateCard}>
-              <View style={styles.emptyIcon}>
-                <Feather name="mic" size={24} color={colors.accent} />
-              </View>
-              <Text style={styles.emptyTitle}>
-                {searchQuery
-                  ? 'No matching recordings'
-                  : 'A little quiet in here'}
-              </Text>
-              <Text style={styles.emptyDescription}>
-                {searchQuery
-                  ? 'Try another title or clear your search.'
-                  : 'Your recordings will appear here when you capture or import audio.'}
-              </Text>
-            </View>
+          <View style={[styles.emptyState, styles.homeEmptyState]}>
+            <Image
+              source={require('../../assets/microphone.png')}
+              style={styles.emptyIllustration}
+              resizeMode="contain"
+              accessibilityLabel={t('emptyRecordingsTitle')}
+            />
+            <Text style={styles.emptyTitle}>
+              {searchQuery
+                ? t('noMatchingRecordings')
+                : t('emptyRecordingsTitle')}
+            </Text>
           </View>
         ) : (
           filteredRecordings.map((recording) => {
@@ -476,9 +502,13 @@ export default function HomeScreen({
           })
         )}
       </Animated.ScrollView>
-      <View
+      <Animated.View
         pointerEvents="box-none"
-        style={[styles.floatingDock, isRecording && styles.recordingPanel]}
+        style={[
+          styles.floatingDock,
+          isRecording && styles.recordingPanel,
+          { transform: [{ translateY: recordingOverlayOffset }] },
+        ]}
       >
         <View pointerEvents="box-none" style={styles.dockContent}>
           {isRecording && (
@@ -486,7 +516,7 @@ export default function HomeScreen({
               <Text style={styles.dockLabel}>{currentRecordingName}</Text>
               <Text style={styles.dockSubtitle}>{elapsedTime}</Text>
               <View
-                accessibilityLabel="Live audio waveform"
+                accessibilityLabel={t('liveAudioWaveform')}
                 pointerEvents="none"
                 style={styles.waveform}
               >
@@ -524,7 +554,7 @@ export default function HomeScreen({
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel={
-                isRecording ? 'Stop recording' : 'Start recording'
+                isRecording ? t('stopRecording') : t('startRecording')
               }
               accessibilityState={{
                 disabled: selectedRecordingPaths.size > 0,
@@ -544,7 +574,7 @@ export default function HomeScreen({
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </Animated.View>
     </SafeAreaView>
   )
 }

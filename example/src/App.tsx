@@ -20,10 +20,17 @@ import ScreenTransition from './ScreenTransition'
 import HomeScreen from './screens/HomeScreen'
 import RecordingScreen from './screens/RecordingScreen'
 import SettingsScreen from './screens/SettingsScreen'
+import { translate } from './i18n'
 import { getThemeColors } from './styles'
-import type { AppearancePreference, AppScreen, Recording } from './types'
+import type {
+  AppLanguage,
+  AppearancePreference,
+  AppScreen,
+  Recording,
+} from './types'
 
 const appearancePreferencePath = `${RNFS.DocumentDirectoryPath}/appearance-preference`
+const languagePreferencePath = `${RNFS.DocumentDirectoryPath}/language-preference`
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('Home')
@@ -39,6 +46,8 @@ export default function App() {
   const [isImportingAudio, setIsImportingAudio] = useState(false)
   const [appearance, setAppearance] = useState<AppearancePreference>('system')
   const [isAppearanceLoaded, setIsAppearanceLoaded] = useState(false)
+  const [language, setLanguage] = useState<AppLanguage>('en')
+  const [isLanguageLoaded, setIsLanguageLoaded] = useState(false)
   const themeOpacity = useRef(new Animated.Value(1)).current
   const backSwipeOffset = useRef(new Animated.Value(0)).current
   const backSwipeStartX = useRef(Number.POSITIVE_INFINITY)
@@ -104,6 +113,39 @@ export default function App() {
       (error) => console.warn('Unable to save appearance preference:', error),
     )
   }, [appearance, isAppearanceLoaded])
+
+  useEffect(() => {
+    let isMounted = true
+    const loadLanguage = async () => {
+      try {
+        if (await RNFS.exists(languagePreferencePath)) {
+          const savedLanguage = await RNFS.readFile(
+            languagePreferencePath,
+            'utf8',
+          )
+          if (savedLanguage === 'en' || savedLanguage === 'kk') {
+            setLanguage(savedLanguage)
+          }
+        }
+      } catch (error) {
+        console.warn('Unable to load language preference:', error)
+      } finally {
+        if (isMounted) setIsLanguageLoaded(true)
+      }
+    }
+
+    void loadLanguage()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isLanguageLoaded) return
+    void RNFS.writeFile(languagePreferencePath, language, 'utf8').catch(
+      (error) => console.warn('Unable to save language preference:', error),
+    )
+  }, [language, isLanguageLoaded])
 
   useEffect(() => {
     if (Platform.OS !== 'android') return
@@ -195,7 +237,10 @@ export default function App() {
         copyTo: 'cachesDirectory',
       })
       if (!selectedFile.fileCopyUri) {
-        throw new Error(selectedFile.copyError || 'Could not access that file.')
+        throw new Error(
+          selectedFile.copyError ||
+            translate(language, 'couldNotAccessFile'),
+        )
       }
 
       const recordingsDirectory = `${RNFS.DocumentDirectoryPath}/whisper`
@@ -207,7 +252,8 @@ export default function App() {
         selectedFile.fileCopyUri,
         outputPath,
       )
-      const sourceName = selectedFile.name || 'Imported audio'
+      const sourceName =
+        selectedFile.name || translate(language, 'importedAudio')
       const displayName = sourceName.replace(/\.[^.]+$/, '')
 
       setRecordings((previousRecordings) => [
@@ -225,8 +271,8 @@ export default function App() {
         const message =
           error instanceof Error
             ? error.message
-            : 'Unable to import this audio.'
-        Alert.alert('Audio import failed', message)
+            : translate(language, 'unableToImportAudio')
+        Alert.alert(translate(language, 'audioImportFailed'), message)
       }
     } finally {
       setIsImportingAudio(false)
@@ -273,6 +319,7 @@ export default function App() {
             isImportingAudio={isImportingAudio}
             onImportAudio={() => void onImportAudio()}
             isDark={isDark}
+            language={language}
           />
         </ScreenTransition>
       )}
@@ -283,6 +330,8 @@ export default function App() {
             appearance={appearance}
             onAppearanceChange={changeAppearance}
             isDark={isDark}
+            language={language}
+            onLanguageChange={setLanguage}
           />
         </ScreenTransition>
       )}
@@ -295,6 +344,7 @@ export default function App() {
             selectedRecordingIndex={selectedRecordingIndex}
             whisperContext={whisperContext}
             isDark={isDark}
+            language={language}
           />
         </ScreenTransition>
       )}
