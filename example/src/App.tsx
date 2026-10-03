@@ -31,12 +31,65 @@ import type {
 
 const appearancePreferencePath = `${RNFS.DocumentDirectoryPath}/appearance-preference`
 const languagePreferencePath = `${RNFS.DocumentDirectoryPath}/language-preference`
+const recordingsMetadataPath = `${RNFS.DocumentDirectoryPath}/recordings.json`
+
+function isRecording(value: unknown): value is Recording {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false
+  }
+
+  const recording = value as Record<string, unknown>
+  return (
+    typeof recording.name === 'string' &&
+    typeof recording.path === 'string' &&
+    typeof recording.recordedAt === 'number' &&
+    typeof recording.duration === 'string' &&
+    (recording.transcribedText === undefined ||
+      typeof recording.transcribedText === 'string')
+  )
+}
+
+function isRecordingArray(value: unknown): value is Recording[] {
+  return Array.isArray(value) && value.every(isRecording)
+}
+
+async function recoverAudioFiles(): Promise<Recording[]> {
+  const directories = [
+    `${RNFS.DocumentDirectoryPath}/soyle`,
+    `${RNFS.DocumentDirectoryPath}/whisper`,
+  ]
+  const recordingsByDirectory = await Promise.all(
+    directories.map(async (directory) => {
+      if (!(await RNFS.exists(directory))) return []
+
+      const files = await RNFS.readDir(directory)
+      return files
+        .filter(
+          (file) =>
+            file.isFile() && file.name.toLowerCase().endsWith('.wav'),
+        )
+        .map((file) => ({
+          name: file.name.replace(/\.wav$/i, ''),
+          path: file.path,
+          recordedAt: file.mtime?.getTime() ?? Date.now(),
+          duration: '0',
+          transcribedText: '',
+        }))
+    }),
+  )
+
+  return recordingsByDirectory
+    .flat()
+    .sort((first, second) => first.recordedAt - second.recordedAt)
+}
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('Home')
   const currentScreenRef = useRef(currentScreen)
   currentScreenRef.current = currentScreen
   const [recordings, setRecordings] = useState<Recording[]>([])
+  const [areRecordingsLoaded, setAreRecordingsLoaded] = useState(false)
+  const recordingsSaveQueue = useRef<Promise<void>>(Promise.resolve())
   const [selectedRecordingIndex, setSelectedRecordingIndex] = useState<
     number | null
   >(null)
@@ -48,6 +101,8 @@ export default function App() {
   const [isAppearanceLoaded, setIsAppearanceLoaded] = useState(false)
   const [language, setLanguage] = useState<AppLanguage>('en')
   const [isLanguageLoaded, setIsLanguageLoaded] = useState(false)
+  const languageRef = useRef(language)
+  languageRef.current = language
   const themeOpacity = useRef(new Animated.Value(1)).current
   const backSwipeOffset = useRef(new Animated.Value(0)).current
   const backSwipeStartX = useRef(Number.POSITIVE_INFINITY)
@@ -146,6 +201,75 @@ export default function App() {
       (error) => console.warn('Unable to save language preference:', error),
     )
   }, [language, isLanguageLoaded])
+
+  useEffect(() => {
+    let isMounted = true
+
+    const loadRecordings = async () => {
+      try {
+        let savedRecordings: Recording[]
+        if (await RNFS.exists(recordingsMetadataPath)) {
+          const metadata: unknown = JSON.parse(
+            await RNFS.readFile(recordingsMetadataPath, 'utf8'),
+          )
+          if (!isRecordingArray(metadata)) {
+            throw new Error('Saved recordings metadata has an invalid format.')
+          }
+          savedRecordings = metadata
+        } else {
+          savedRecordings = await recoverAudioFiles()
+        }
+
+        if (!isMounted) return
+        setRecordings((currentRecordings) => {
+          const currentPaths = new Set(
+            currentRecordings.map((recording) => recording.path),
+          )
+          return [
+            ...savedRecordings.filter(
+              (recording) => !currentPaths.has(recording.path),
+            ),
+            ...currentRecordings,
+          ]
+        })
+        setAreRecordingsLoaded(true)
+      } catch (error) {
+        console.warn('Unable to load recordings:', error)
+        if (isMounted) {
+          Alert.alert(
+            translate(languageRef.current, 'recordingsLoadFailed'),
+            error instanceof Error
+              ? error.message
+              : translate(languageRef.current, 'unableToLoadRecordings'),
+          )
+        }
+      }
+    }
+
+    void loadRecordings()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!areRecordingsLoaded) return
+
+    const serializedRecordings = JSON.stringify(recordings)
+    recordingsSaveQueue.current = recordingsSaveQueue.current
+      .then(() =>
+        RNFS.writeFile(recordingsMetadataPath, serializedRecordings, 'utf8'),
+      )
+      .catch((error) => {
+        console.warn('Unable to save recordings:', error)
+        Alert.alert(
+          translate(languageRef.current, 'recordingsSaveFailed'),
+          error instanceof Error
+            ? error.message
+            : translate(languageRef.current, 'unableToSaveRecordings'),
+        )
+      })
+  }, [areRecordingsLoaded, recordings])
 
   useEffect(() => {
     if (Platform.OS !== 'android') return

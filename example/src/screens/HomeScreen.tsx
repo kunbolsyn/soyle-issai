@@ -17,6 +17,7 @@ import {
 } from 'react-native'
 import RNFS from 'react-native-fs'
 import AudioRecord from 'react-native-audio-record'
+import uuid from 'react-native-uuid'
 import {
   formatRecordingDuration,
   formatRecordingTimestamp,
@@ -155,7 +156,7 @@ export default function HomeScreen({
     if (!isDirExist) {
       await RNFS.mkdir(dirPath)
     }
-    const fileName = `recording${recordings.length + 1}.wav`
+    const fileName = `recording-${uuid.v4()}.wav`
     recordingStartedAt.current = Date.now()
     AudioRecord.init({
       sampleRate: 16000,

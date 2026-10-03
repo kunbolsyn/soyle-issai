@@ -71,6 +71,10 @@ const translations = {
     couldNotAccessFile: 'Could not access that file.',
     importedAudio: 'Imported audio',
     unableToImportAudio: 'Unable to import this audio.',
+    recordingsLoadFailed: 'Unable to load recordings',
+    unableToLoadRecordings: 'Saved recordings could not be loaded.',
+    recordingsSaveFailed: 'Unable to save recordings',
+    unableToSaveRecordings: 'Recording changes could not be saved.',
   },
   kk: {
     backToRecordings: 'Жазбаларға оралу',
@@ -142,6 +146,10 @@ const translations = {
     couldNotAccessFile: 'Бұл файлға қол жеткізу мүмкін болмады.',
     importedAudio: 'Импортталған аудио',
     unableToImportAudio: 'Бұл аудионы импорттау мүмкін болмады.',
+    recordingsLoadFailed: 'Жазбаларды жүктеу мүмкін болмады',
+    unableToLoadRecordings: 'Сақталған жазбаларды жүктеу мүмкін болмады.',
+    recordingsSaveFailed: 'Жазбаларды сақтау мүмкін болмады',
+    unableToSaveRecordings: 'Жазба өзгерістерін сақтау мүмкін болмады.',
   },
 } satisfies Record<AppLanguage, Record<string, string>>
 
