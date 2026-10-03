@@ -537,7 +537,9 @@ export default function RecordingScreen({
             onPress={() => seekBySeconds(-5)}
           >
             <Feather name="rotate-ccw" size={32} color={colors.primary} />
-            <Text style={styles.playbackSkipLabel}>5</Text>
+            <Text style={[styles.playbackSkipLabel, { color: colors.primary }]}>
+              5
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             accessibilityRole="button"
@@ -560,7 +562,9 @@ export default function RecordingScreen({
             onPress={() => seekBySeconds(5)}
           >
             <Feather name="rotate-cw" size={32} color={colors.primary} />
-            <Text style={styles.playbackSkipLabel}>5</Text>
+            <Text style={[styles.playbackSkipLabel, { color: colors.primary }]}>
+              5
+            </Text>
           </TouchableOpacity>
         </View>
       </View>

@@ -238,8 +238,7 @@ export default function App() {
       })
       if (!selectedFile.fileCopyUri) {
         throw new Error(
-          selectedFile.copyError ||
-            translate(language, 'couldNotAccessFile'),
+          selectedFile.copyError || translate(language, 'couldNotAccessFile'),
         )
       }
 
@@ -284,7 +283,7 @@ export default function App() {
       console.log('Initialize context...')
       const startTime = Date.now()
       const context = await initWhisper({
-        filePath: require('../assets/ggml-tiny.bin'),
+        filePath: require('../assets/ggml-tiny.en.bin'),
         ...contextOpts,
       })
       console.log('Loaded model, ID:', context.id)
